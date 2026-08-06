@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34D399"/>
+      <stop offset="100%" stop-color="#38BDF8"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="30" fill="url(#g2)"/>
+  <!-- Pharmacy Cross & Soundwave combination -->
+  <rect x="48" y="24" width="24" height="72" rx="8" fill="#022c22" opacity="0.95"/>
+  <rect x="24" y="48" width="72" height="24" rx="8" fill="#022c22" opacity="0.95"/>
+  <!-- Audio wave indicator in center -->
+  <circle cx="60" cy="60" r="7" fill="#34D399"/>
+  <circle cx="60" cy="60" r="16" stroke="#022c22" stroke-width="2.5" stroke-dasharray="4 4" opacity="0.8"/>
+</svg>
