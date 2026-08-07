@@ -38,10 +38,10 @@ export const WelcomeView = ({
         <WelcomeImage />
 
         <h1 className="text-foreground text-lg font-semibold tracking-tight">
-          Bharat Local Store Voice Assistant
+          Swasthya Bharat (સ્વાસ્થ્ય ભારત)
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          સ્થાનિક કરિયાણા અને જનરલ સ્ટોર • ગુજરાતી & English
+          Health Access & Care Voice Assistant • ગુજરાતી & English
         </p>
 
         <Button
@@ -53,7 +53,7 @@ export const WelcomeView = ({
         </Button>
 
         <p className="text-muted-foreground mt-4 text-xs">
-          કરિયાણું, સામાનના ભાવ, દુકાન સમય અને હોમ ડિલિવરી માટે પૂછો
+          આયુષ્માન PM-JAY કાર્ડ, ABHA હેલ્થ ID, સરકારી હોસ્પિટલ અને સ્વાસ્થ્ય સેવાની માહિતી માટે પૂછો
         </p>
       </section>
 

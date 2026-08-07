@@ -1,284 +1,248 @@
-# Voice Agent Starter — Powered by Murf Falcon
+# 🏥 Swasthya Bharat (સ્વાસ્થ્ય ભારત) — AI Voice Assistant for Health Access
 
-Build a production voice AI agent in 5 minutes. Powered by the fastest TTS on the market - swap the system prompt to build anything from customer support to language tutors.
+> **Bridging the healthcare gap across India with ultra-fast, bilingual AI voice assistance in Gujarati (ગુજરાતી) and English.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Murf Falcon](https://img.shields.io/badge/TTS-Murf%20Falcon-6366F1)](https://murf.ai/api/docs/text-to-speech/streaming) [![LiveKit](https://img.shields.io/badge/Transport-LiveKit-002cf2)](https://docs.livekit.io) [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-
----
-
-## Why Murf Falcon
-
-- **55ms model latency** - fastest production TTS
-- **130ms time-to-first-audio** across 10+ global regions
-- **$0.01/1000 characters** - up to 10x cheaper than alternatives
-- **150+ voices** across 35+ languages
-- **99.38% pronunciation accuracy**
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Murf Falcon](https://img.shields.io/badge/TTS-Murf%20Falcon%20(55ms)-6366F1)](https://murf.ai/api/docs/text-to-speech/streaming)
+[![LiveKit](https://img.shields.io/badge/Transport-LiveKit-002cf2)](https://docs.livekit.io)
+[![Deepgram](https://img.shields.io/badge/STT-Deepgram%20Nova--3-13EF95)](https://deepgram.com)
+[![Gemini](https://img.shields.io/badge/LLM-Gemini%203.5%20Flash-4285F4)](https://aistudio.google.com)
+[![TypeScript](https://img.shields.io/badge/Frontend-Next.js%20%2F%20TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Python](https://img.shields.io/badge/Backend-Python%203.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 
 ---
 
-## Architecture
+## 📌 Overview
+
+**Swasthya Bharat (સ્વાસ્થ્ય ભારત)** is a production-ready, real-time voice AI assistant designed to democratize **Healthcare Access** for Indian citizens. By combining **Murf Falcon TTS** (the fastest voice synthesis engine on the market), **Deepgram Nova-3 STT**, **Google Gemini 3.5**, and **LiveKit Agents**, Swasthya Bharat enables hands-free, natural conversational queries in regional languages.
+
+Citizens can ask questions in **Gujarati** or **English** to navigate government health initiatives, locate public health facilities, check scheme eligibility, and understand routine care processes without needing literacy in complex medical portal interfaces.
+
+---
+
+## 🌟 Key Features
+
+- 📜 **Government Health Schemes**: Quick guidance on **Ayushman Bharat PM-JAY** (eligibility, ₹5 Lakh family cover, card application, and empaneled hospitals).
+- 🆔 **ABHA Health ID Registration**: Step-by-step assistance for creating Ayushman Bharat Health Account (ABHA) digital health IDs.
+- 🏥 **Health Facility Finder**: Helps users locate nearby Government Hospitals, Primary Health Centers (PHCs), and Community Health Centers (CHCs).
+- 👶 **Maternal & Immunization Care**: Information on maternal care, child vaccination schedules, and general preventative wellness.
+- 🗣️ **Native Gujarati & English Bilingual Interface**: Seamlessly understands and responds in authentic Gujarati (ગુજરાતી), English, or mixed Gujlish conversations.
+- ⚡ **Sub-Second Latency**: Powered by **Murf Falcon TTS** (55ms latency) and LiveKit WebRTC streaming for immediate, human-like responses.
+- 🛡️ **Safety & Responsible AI**: Built-in strict medical disclaimers with emergency escalation protocols (redirecting medical diagnoses/emergencies to doctors and 108 emergency services).
+
+---
+
+## 🏗️ System Architecture
 
 ```mermaid
 flowchart LR
-    A[🎙️ User speaks] -->|audio| B[Deepgram STT]
-    B -->|text| C[LLM]
-    C -->|response text| D[Murf Falcon TTS]
-    D -->|audio| E[LiveKit]
-    E -->|stream| F[🔊 User hears]
+    A[🎙️ Citizen Speaks<br/><i>Gujarati / English</i>] -->|WebRTC Audio Stream| B[Deepgram Nova-3 STT<br/><i>Multilingual Speech-to-Text</i>]
+    B -->|Transcribed Text| C[Google Gemini 3.5 LLM<br/><i>Swasthya Bharat Agent Logic</i>]
+    C -->|Response Text| D[Murf Falcon TTS<br/><i>Anisha Voice (55ms Latency)</i>]
+    D -->|Synthesized Audio| E[LiveKit Real-Time Engine]
+    E -->|Low-Latency Stream| F[🔊 Citizen Hears<br/><i>Natural Voice Response</i>]
 
-    style A fill:#444441,stroke:#888780,color:#fff
-    style B fill:#185FA5,stroke:#85B7EB,color:#fff
-    style C fill:#534AB7,stroke:#AFA9EC,color:#fff
-    style D fill:#0F6E56,stroke:#5DCAA5,color:#fff
-    style E fill:#D85A30,stroke:#F0997B,color:#fff
-    style F fill:#444441,stroke:#888780,color:#fff
+    style A fill:#1e293b,stroke:#64748b,color:#fff
+    style B fill:#0f766e,stroke:#14b8a6,color:#fff
+    style C fill:#4338ca,stroke:#6366f1,color:#fff
+    style D fill:#0369a1,stroke:#0ea5e9,color:#fff
+    style E fill:#c2410c,stroke:#f97316,color:#fff
+    style F fill:#1e293b,stroke:#64748b,color:#fff
 ```
 
 ---
 
-## Quickstart
+## 🗣️ Sample Conversations
+
+<details open>
+<summary><b>1. PM-JAY & Ayushman Card Inquiry (Gujarati)</b></summary>
+
+> **User:** *"નમસ્તે, આયુષ્માન કાર્ડ કેવી રીતે બનાવવું અને તેમાં શું લાભ મળે?"*  
+> **Swasthya Bharat Agent:** *"નમસ્તે! આયુષ્માન ભારત PM-JAY કાર્ડ હેઠળ દરેક પરિવારને વર્ષે ₹5 લાખ સુધીની મફત સારવાર મળે છે. તમે નજીકના સરકારી હોસ્પિટલ અથવા સીએસસી સેન્ટર પર રેશન કાર્ડ અને આધાર કાર્ડ લઈને જઈ શકો છો."*
+</details>
+
+<details>
+<summary><b>2. Locating PHC & Child Immunization (English / Gujlish)</b></summary>
+
+> **User:** *"Where is the nearest PHC center and what vaccines are needed for 6-month-old baby?"*  
+> **Swasthya Bharat Agent:** *"You can find your nearest Primary Health Center (PHC) at your local taluka hospital or district health department. For a 6-month-old baby, routine vaccines include Pentavalent and Oral Polio Vaccine. Please consult your local PHC nurse or doctor for exact scheduling."*
+</details>
+
+<details>
+<summary><b>3. Medical Disclaimer & Emergency Safety (Gujarati)</b></summary>
+
+> **User:** *"મને ખૂબ છાતીમાં દુખાવો થાય છે, મને કઈ દવા લેવી જોઈએ?"*  
+> **Swasthya Bharat Agent:** *"હું એઆઈ આસિસ્ટન્ટ છું, ડૉક્ટર નથી. જો તમને છાતીમાં દુખાવો થતો હોય તો કૃપા કરીને તરત જ નજીકના ડૉક્ટરનો સંપર્ક કરો અથવા 108 પર કૉલ કરીને ઇમરજન્સી મદદ લો."*
+</details>
+
+---
+
+## 🚀 Quickstart Guide
 
 ### Prerequisites
 
-- **Python** 3.10+
-- **[uv](https://docs.astral.sh/uv/)** - fast Python package manager
+- **Python** 3.10 or higher
+- **[uv](https://docs.astral.sh/uv/)** — High-performance Python package manager
   ```bash
-  # macOS/Linux
+  # macOS / Linux
   curl -LsSf https://astral.sh/uv/install.sh | sh
   # Windows (PowerShell)
   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
   ```
-- **Node.js** 18+
-- **pnpm** — fast Node package manager
+- **Node.js** 18+ & **pnpm**
   ```bash
   npm install -g pnpm
   ```
-- A [LiveKit](https://cloud.livekit.io/) project (free tier available)
+- A free [LiveKit Cloud](https://cloud.livekit.io/) account
 
-### Step 1: Clone the repo
+---
+
+### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/murf-ai/murf-livekit-starter.git
-cd murf-livekit-starter
+git clone https://github.com/ayush2006jadav-cell/MurfAI_Voice_of_Bharat.git
+cd VoiceForBharat-main
 ```
 
-### Step 2: Set up environment variables
+---
 
-Create `.env.local` in both `backend/` and `frontend/` (copy from `.env.example` in each). You need:
+### Step 2: Environment Setup
 
-| Variable                               | Where to get it                                        | Required |
-| -------------------------------------- | ------------------------------------------------------ | -------- |
-| `LIVEKIT_URL`                          | LiveKit Cloud dashboard                                | Yes      |
-| `LIVEKIT_API_KEY`                      | LiveKit Cloud dashboard                                | Yes      |
-| `LIVEKIT_API_SECRET`                   | LiveKit Cloud dashboard                                | Yes      |
-| `MURF_API_KEY`                         | [murf.ai/api/dashboard](https://murf.ai/api/dashboard) | Yes      |
-| `DEEPGRAM_API_KEY`                     | [deepgram.com](https://deepgram.com)                   | Yes      |
-| `GOOGLE_API_KEY` (or `OPENAI_API_KEY`) | Depends on LLM choice                                  | Yes      |
+Create `.env.local` files in both `backend/` and `frontend/` directories:
 
-### Step 3: Install backend dependencies
+#### `backend/.env.local`
+```env
+LIVEKIT_URL=wss://your-livekit-project.livekit.cloud
+LIVEKIT_API_KEY=your_livekit_api_key
+LIVEKIT_API_SECRET=your_livekit_api_secret
+MURF_API_KEY=your_murf_api_key
+DEEPGRAM_API_KEY=your_deepgram_api_key
+GOOGLE_API_KEY=your_google_gemini_api_key
+```
+
+#### `frontend/.env.local`
+```env
+LIVEKIT_URL=wss://your-livekit-project.livekit.cloud
+LIVEKIT_API_KEY=your_livekit_api_key
+LIVEKIT_API_SECRET=your_livekit_api_secret
+AGENT_NAME=my-agent
+```
+
+---
+
+### Step 3: Install & Run Backend
 
 ```bash
 cd backend
 uv sync
-uv run python src/agent.py download-files
+uv run python src/agent.py download-files   # Download VAD & Turn Detector models (first time only)
+uv run python src/agent.py dev              # Start agent in development mode
 ```
 
-### Step 4: Install frontend dependencies
+---
+
+### Step 4: Install & Run Frontend
+
+In a new terminal window:
 
 ```bash
 cd frontend
 pnpm install
+pnpm dev
 ```
 
-### Step 5: Run it
+Open **`http://localhost:3000`** in your browser, click **"Start Talking / વાત શરૂ કરો"**, allow microphone access, and begin speaking!
 
-**Option A - All-in-one (from repo root):**
+---
+
+### Step 5: All-In-One Launcher (Optional)
+
+Alternatively, run all services simultaneously using the root scripts:
 
 ```bash
-# macOS/Linux
-chmod +x start_app.sh
-./start_app.sh
-
 # Windows (PowerShell)
 .\start_app.ps1
+
+# macOS / Linux
+chmod +x start_app.sh
+./start_app.sh
 ```
 
-**Option B - Separate terminals:**
+---
+
+## ⚙️ Configuration & Customization
+
+All core agent parameters are configured in [`backend/src/agent.py`](./backend/src/agent.py) and [`frontend/app-config.ts`](./frontend/app-config.ts).
+
+### 🎙️ Changing Voice & Persona
+
+- **Murf Voice**: Managed via `murf.TTS(voice="Anisha", style="Conversation", ...)` in `agent.py`. Explore all voices at [Murf Voice Library](https://murf.ai/api/docs/voices-styles/voice-library).
+- **System Prompt**: Edit `SYSTEM_PROMPT` in `agent.py` to add new health categories, local dialects, or hospital databases.
+
+### 🧠 LLM & Speech Engines
+
+- **STT**: Deepgram Nova-3 (`deepgram.STT(model="nova-3", language="multi")`) for Gujarati and English.
+- **LLM**: Google Gemini 3.5 Flash-Lite (`google.LLM(model="gemini-3.5-flash-lite")`).
+
+---
+
+## 📂 Repository Structure
+
+```
+VoiceForBharat/
+├── backend/                 # Python Voice Agent
+│   ├── src/
+│   │   └── agent.py         # Swasthya Bharat System Prompt, Murf TTS & LiveKit pipeline
+│   ├── tests/               # LLM-judged evaluation tests (pytest)
+│   ├── .env.example         # Backend environment variables template
+│   ├── pyproject.toml       # Python dependencies (uv)
+│   └── railway.toml         # Deployment configuration for Railway
+├── frontend/                # Next.js Voice Web App
+│   ├── app/                 # Next.js app router & token endpoints
+│   ├── components/          # Voice UI components & audio visualizer
+│   ├── app-config.ts        # Health theme branding & visualizer config
+│   ├── .env.example         # Frontend environment variables template
+│   └── package.json         # Node.js dependencies (pnpm)
+├── start_app.ps1            # Windows single-command launcher
+├── start_app.sh             # Linux/macOS single-command launcher
+└── README.md                # Project documentation
+```
+
+---
+
+## 🧪 Testing & Evaluation
+
+The backend includes an LLM-as-judge test suite built on LiveKit's testing framework:
 
 ```bash
-# Terminal 1 — LiveKit Server
-livekit-server --dev
-
-# Terminal 2 — Backend agent
-cd backend && uv run python src/agent.py dev
-
-# Terminal 3 — Frontend
-cd frontend && pnpm dev
+cd backend
+uv run pytest
 ```
 
-Then open **http://localhost:3000** in your browser.
-
-You should now see the voice agent UI. Click **Start talking**, allow microphone access, and speak — the agent will respond with Murf Falcon TTS. Ensure your backend and (if using Option B) LiveKit server are running.
+Tests evaluate critical agent behaviors including welcoming users in Gujarati/English, upholding medical disclaimers, and accurately providing PM-JAY scheme details.
 
 ---
 
-## Deploy
+## 🌐 Deployment Guide
 
-Want to deploy this beyond localhost? You'll need to deploy **two services**: the backend agent and the frontend. Both must use the same LiveKit project.
-
-> This is a two-service app — the backend agent and the frontend UI deploy separately. You'll need both running and connected to the same LiveKit project.
-
-### Backend (Python agent) — Deploy to Railway
-
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/tIVCF1?referralCode=cNjn2P&utm_medium=integration&utm_source=template&utm_campaign=generic)
-
-Set these environment variables in Railway:
-
-- `MURF_API_KEY`
-- `DEEPGRAM_API_KEY`
-- `GOOGLE_API_KEY` or `OPENAI_API_KEY`
-- `LIVEKIT_URL`
-- `LIVEKIT_API_KEY`
-- `LIVEKIT_API_SECRET`
-
-The backend runs as a long-lived Python process that connects to LiveKit as an agent. Railway handles this well.
-
-### Frontend (Next.js) — Deploy to Vercel
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/murf-ai/murf-livekit-starter&root-directory=frontend&env=LIVEKIT_URL,LIVEKIT_API_KEY,LIVEKIT_API_SECRET&project-name=murf-voice-agent&repository-name=murf-voice-agent)
-
-Set these environment variables in Vercel:
-
-- `LIVEKIT_URL`
-- `LIVEKIT_API_KEY`
-- `LIVEKIT_API_SECRET`
-- `AGENT_NAME` (optional — for explicit agent dispatch)
-
-The frontend is a standard Next.js app. Point it at the same LiveKit instance your backend agent is connected to.
-
-### Connecting them
-
-The frontend and backend don't call each other directly — they both connect to **LiveKit**, which handles the real-time audio transport.
-
-1. Use the **same** `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` on both Railway and Vercel
-2. Set `AGENT_NAME=my-agent` on Vercel — this matches the `agent_name="my-agent"` registered in `backend/src/agent.py`
-3. Verify: Railway logs should show the agent connected to LiveKit. Open your Vercel URL, click **Start talking** — the agent should respond
-
-If the agent doesn't connect, double-check that both services point to the same LiveKit project and that the backend is running (check Railway logs).
+| Service | Platform | Deploy Link / Instructions |
+| :--- | :--- | :--- |
+| **Backend Agent** | **Railway / Docker** | [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy) <br/> Deploy as a background Python worker connecting to LiveKit. |
+| **Frontend UI** | **Vercel** | [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new) <br/> Deploy Next.js app with `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET`. |
 
 ---
 
-## Change the Use Case
+## 🔗 Official Documentation & References
 
-The default system prompt makes this a **customer support agent**. You can change the agent’s behavior by editing the prompt.
-
-**Where the prompt lives:** `backend/src/agent.py`- the `SYSTEM_PROMPT` constant (near the top of the file, after the imports). Change that string to change what your voice agent does.
-
-### Example prompts (copy-paste)
-
-**Local Store & Kirana Shopkeeper (Active Default - Gujarati & English):**
-
-```
-You are a friendly, helpful, and polite voice assistant for a local commerce store and Kirana shop (સ્થાનિક દુકાનદાર / કરિયાણા અને જનરલ સ્ટોર). You assist local customers fluently in both Gujarati (ગુજરાતી) and English. Help customers with groceries, stock availability, daily provisions, prices, store timings, and home delivery.
-```
-
-**Customer Support:**
-
-```
-You are a friendly and efficient customer support agent for a tech company. Help users with account issues, billing questions, and product troubleshooting. Be concise, empathetic, and solution-oriented. If you don't know something, say so honestly and offer to escalate.
-```
-
-**Language Tutor:**
-
-```
-You are a patient and encouraging language tutor helping the user practice conversational Spanish. Speak primarily in Spanish but switch to English to explain grammar or vocabulary when needed. Correct mistakes gently and suggest better phrasing. Keep conversations natural and fun.
-```
-
-**AI Receptionist:**
-
-```
-You are a professional receptionist for a medical clinic. Help callers schedule appointments, answer questions about office hours and services, and take messages for doctors. Be warm but efficient. Ask for the caller's name and reason for calling upfront.
-```
-
-See the Configuration section below for voice, STT, and LLM options.
+- 🎙️ [Murf Falcon TTS Documentation](https://murf.ai/api/docs/text-to-speech/streaming)
+- 🔊 [Murf Voice Library](https://murf.ai/api/docs/voices-styles/voice-library)
+- ⚡ [LiveKit Agents SDK](https://docs.livekit.io/agents)
+- 📝 [Deepgram Speech Recognition](https://developers.deepgram.com)
+- 🤖 [Google Gemini AI](https://ai.google.dev/)
+- 🏥 [Ayushman Bharat PM-JAY Portal](https://pmjay.gov.in/)
 
 ---
 
-## Configuration
+## 📄 License
 
-### Murf voice
-
-Edit the `tts=murf.TTS(...)` call in `backend/src/agent.py`. Set the `voice` argument to any Murf voice ID. Examples:
-
-- `Anisha` — Indian English (female, default in this starter)
-- `Amara` — US English (female)
-- `Hazel` — UK English (female)
-- `Gordon` — US English (male)
-
-Browse all voices: [Murf Voice Library](https://murf.ai/api/docs/voices-styles/voice-library).
-
-### STT provider
-
-STT is configured in `backend/src/agent.py` in the `AgentSession(stt=...)` call. The default is Deepgram (`deepgram.STT(model="nova-3")`). You can swap to another LiveKit-compatible STT plugin if needed.
-
-### LLM (Gemini vs OpenAI)
-
-- **Gemini (default):** Set `GOOGLE_API_KEY` and use `llm=google.LLM(model="gemini-3.5-flash-lite")` in `agent.py`.
-- **OpenAI:** Set `OPENAI_API_KEY`, add the OpenAI plugin, and use the corresponding `llm=openai.LLM(...)` in `agent.py`.
-
-### Audio format
-
-Murf Falcon and LiveKit handle audio format internally. For advanced options, see [Murf API docs](https://murf.ai/api/docs) and [LiveKit docs](https://docs.livekit.io).
-
----
-
-## Project Structure
-
-```
-murf-livekit-starter/
-├── backend/                 # Python voice agent (LiveKit Agents + Murf Falcon)
-│   ├── src/
-│   │   └── agent.py         # Agent entrypoint, pipeline (STT/LLM/TTS), system prompt
-│   ├── tests/               # Agent tests
-│   ├── .env.example         # Backend env template
-│   ├── pyproject.toml       # Python deps (uv)
-│   └── railway.toml         # Railway deploy config
-├── frontend/                # Next.js UI for voice sessions
-│   ├── app/
-│   │   ├── page.tsx         # Main page
-│   │   └── api/token/       # LiveKit token endpoint (dev)
-│   ├── components/          # UI (agents-ui, app config, theme)
-│   ├── app-config.ts        # Branding, title, button text, accent
-│   ├── .env.example         # Frontend env template
-│   └── package.json         # Node deps (pnpm)
-├── start_app.sh             # Start LiveKit + backend + frontend (macOS/Linux)
-├── start_app.ps1            # Start LiveKit + backend + frontend (Windows)
-├── README.md                # This file
-```
-
-For deeper documentation on each part, see:
-
-- [Backend Documentation](./backend/README.md) — agent pipeline, voice/LLM/STT configuration, testing, deployment
-- [Frontend Documentation](./frontend/README.md) — UI customization, visualizers, theming, component architecture
-
----
-
-## Links
-
-- [Murf API Docs](https://murf.ai/api/docs)
-- [Murf Voice Library](https://murf.ai/api/docs/voices-styles/voice-library)
-- [LiveKit Docs](https://docs.livekit.io)
-- [Deepgram Docs](https://developers.deepgram.com)
-- [Murf Falcon Benchmarks](https://murf.ai/falcon/benchmarks)
-- [TTS Latency Benchmarker](https://github.com/sahilsgupta/tts-latency-benchmarker) — run your own p50/p95 tests across providers
-- [Murf Discord](https://discord.gg/FbKAy96Sz7)
-- [Murf Startup Incubator](https://murf.ai/api) — 50M free characters for startups
-
----
-
-## License
-
-MIT
-#   M u r f A I _ V o i c e _ o f _ B h a r a t  
- #   M u r f A I _ V o i c e _ o f _ B h a r a t  
- 
+Distributed under the **MIT License**. See [`LICENSE`](./LICENSE) for more information.

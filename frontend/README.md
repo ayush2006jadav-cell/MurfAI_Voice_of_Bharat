@@ -51,21 +51,21 @@ Edit [`app-config.ts`](app-config.ts) to change branding, features, and button t
 
 ```ts
 export const APP_CONFIG_DEFAULTS: AppConfig = {
-  companyName: 'Murf AI',
-  pageTitle: 'Voice Agent Starter',
-  pageDescription: 'A voice agent powered by Murf Falcon — the fastest TTS API',
+  companyName: 'Swasthya Bharat (સ્વાસ્થ્ય ભારત)',
+  pageTitle: 'Swasthya Bharat — Health Access Voice AI (Gujarati & English)',
+  pageDescription: 'Your friendly health access voice assistant fluent in Gujarati (ગુજરાતી) and English, assisting with government health schemes and local health centers.',
 
   supportsChatInput: true,
   supportsVideoInput: true,
   supportsScreenShare: true,
 
   logo: '/murf-logo.svg',
-  accent: '#6366F1',
+  accent: '#0EA5E9',
   logoDark: '/murf-logo-dark.svg',
-  accentDark: '#818cf8',
-  startButtonText: 'Start talking',
+  accentDark: '#38bdf8',
+  startButtonText: 'Start Talking / વાત શરૂ કરો',
 
-  agentName: process.env.AGENT_NAME ?? undefined,
+  agentName: process.env.AGENT_NAME ?? 'my-agent',
 };
 ```
 
