@@ -1,7 +1,10 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
-function WelcomeImage() {
+// Healthcare cross icon
+function HealthcareIcon() {
   return (
     <svg
       width="64"
@@ -10,65 +13,228 @@ function WelcomeImage() {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className="text-foreground mb-4 size-16"
+      aria-hidden="true"
     >
-      <path
-        d="M15 24V40C15 40.7957 14.6839 41.5587 14.1213 42.1213C13.5587 42.6839 12.7956 43 12 43C11.2044 43 10.4413 42.6839 9.87868 42.1213C9.31607 41.5587 9 40.7957 9 40V24C9 23.2044 9.31607 22.4413 9.87868 21.8787C10.4413 21.3161 11.2044 21 12 21C12.7956 21 13.5587 21.3161 14.1213 21.8787C14.6839 22.4413 15 23.2044 15 24ZM22 5C21.2044 5 20.4413 5.31607 19.8787 5.87868C19.3161 6.44129 19 7.20435 19 8V56C19 56.7957 19.3161 57.5587 19.8787 58.1213C20.4413 58.6839 21.2044 59 22 59C22.7956 59 23.5587 58.6839 24.1213 58.1213C24.6839 57.5587 25 56.7957 25 56V8C25 7.20435 24.6839 6.44129 24.1213 5.87868C23.5587 5.31607 22.7956 5 22 5ZM32 13C31.2044 13 30.4413 13.3161 29.8787 13.8787C29.3161 14.4413 29 15.2044 29 16V48C29 48.7957 29.3161 49.5587 29.8787 50.1213C30.4413 50.6839 31.2044 51 32 51C32.7956 51 33.5587 50.6839 34.1213 50.1213C34.6839 49.5587 35 48.7957 35 48V16C35 15.2044 34.6839 14.4413 34.1213 13.8787C33.5587 13.3161 32.7956 13 32 13ZM42 21C41.2043 21 40.4413 21.3161 39.8787 21.8787C39.3161 22.4413 39 23.2044 39 24V40C39 40.7957 39.3161 41.5587 39.8787 42.1213C40.4413 42.6839 41.2043 43 42 43C42.7957 43 43.5587 42.6839 44.1213 42.1213C44.6839 41.5587 45 40.7957 45 40V24C45 23.2044 44.6839 22.4413 44.1213 21.8787C43.5587 21.3161 42.7957 21 42 21ZM52 17C51.2043 17 50.4413 17.3161 49.8787 17.8787C49.3161 18.4413 49 19.2044 49 20V44C49 44.7957 49.3161 45.5587 49.8787 46.1213C50.4413 46.6839 51.2043 47 52 47C52.7957 47 53.5587 46.6839 54.1213 46.1213C54.6839 45.5587 55 44.7957 55 44V20C55 19.2044 54.6839 18.4413 54.1213 17.8787C53.5587 17.3161 52.7957 17 52 17Z"
-        fill="currentColor"
-      />
+      <circle cx="32" cy="32" r="30" stroke="currentColor" strokeWidth="2" opacity="0.15" />
+      <rect x="26" y="14" width="12" height="36" rx="3" fill="currentColor" opacity="0.8" />
+      <rect x="14" y="26" width="36" height="12" rx="3" fill="currentColor" opacity="0.8" />
     </svg>
   );
 }
 
+// Animated pulsing dots for connecting state
+function PulsingDots() {
+  return (
+    <div className="flex items-center justify-center gap-1.5 mt-3" aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="inline-block size-2 rounded-full bg-current opacity-60"
+          style={{ animation: `sb-pulse 1.2s ease-in-out ${i * 0.2}s infinite` }}
+        />
+      ))}
+      <style>{`
+        @keyframes sb-pulse {
+          0%, 80%, 100% { transform: scale(0.6); opacity: 0.35; }
+          40% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// Microphone blocked icon
+function MicBlockedIcon() {
+  return (
+    <svg
+      width="56"
+      height="56"
+      viewBox="0 0 56 56"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="mb-4 size-14 text-destructive"
+      aria-hidden="true"
+    >
+      <circle cx="28" cy="28" r="26" stroke="currentColor" strokeWidth="2" opacity="0.2" />
+      <rect x="22" y="12" width="12" height="20" rx="6" fill="currentColor" opacity="0.45" />
+      <path
+        d="M16 28c0 6.627 5.373 12 12 12s12-5.373 12-12"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        opacity="0.45"
+      />
+      <line x1="28" y1="40" x2="28" y2="46" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.45" />
+      <line x1="23" y1="46" x2="33" y2="46" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.45" />
+      <line x1="11" y1="11" x2="45" y2="45" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export type WelcomeState = 'ready' | 'connecting' | 'ended';
+
 interface WelcomeViewProps {
   startButtonText: string;
   onStartCall: () => void;
+  /** Current state of the pre-session view */
+  viewState?: WelcomeState;
 }
 
 export const WelcomeView = ({
   startButtonText,
   onStartCall,
+  viewState = 'ready',
   ref,
+  ...rest
 }: React.ComponentProps<'div'> & WelcomeViewProps) => {
+  const [micError, setMicError] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+
+  const handleStartCall = async () => {
+    setMicError(false);
+    // Pre-check microphone permission to give a clear error instead of failing silently
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Stop the test stream immediately — the agent will open its own
+      stream.getTracks().forEach((t) => t.stop());
+    } catch {
+      setMicError(true);
+      return;
+    }
+    onStartCall();
+  };
+
+  const handleRetry = async () => {
+    setRetrying(true);
+    setMicError(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+      setRetrying(false);
+      onStartCall();
+    } catch {
+      setRetrying(false);
+      setMicError(true);
+    }
+  };
+
   return (
     <div
       ref={ref}
       className="flex min-h-[calc(100vh-80px)] w-full flex-col items-center justify-center px-4"
+      {...rest}
     >
       <section className="bg-background flex max-w-md flex-col items-center justify-center text-center">
-        <WelcomeImage />
 
-        <h1 className="text-foreground text-lg font-semibold tracking-tight">
-          Swasthya Bharat (સ્વાસ્થ્ય ભારત)
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Health Access & Care Voice Assistant • ગુજરાતી & English
-        </p>
+        {/* ── MICROPHONE PERMISSION ERROR ──────────────────────────── */}
+        {micError && (
+          <>
+            <MicBlockedIcon />
+            <h1 className="text-foreground text-lg font-semibold tracking-tight">
+              Microphone Access Required
+            </h1>
+            <p className="text-muted-foreground mt-2 max-w-xs text-sm leading-relaxed">
+              Swasthya Bharat needs microphone access to have a voice conversation with you.
+            </p>
+            <div className="bg-muted mt-4 w-full rounded-lg px-4 py-3 text-left text-xs text-muted-foreground">
+              <p className="font-semibold mb-1">How to allow microphone access:</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Click the lock icon in your browser address bar.</li>
+                <li>
+                  Find <strong>Microphone</strong> and set it to <strong>Allow</strong>.
+                </li>
+                <li>Click <strong>Try Again</strong> below.</li>
+              </ol>
+            </div>
+            <Button
+              id="mic-retry-button"
+              size="lg"
+              onClick={handleRetry}
+              disabled={retrying}
+              className="mt-5 min-w-[200px] cursor-pointer rounded-full px-8 py-3 font-mono text-xs font-bold tracking-wider uppercase"
+            >
+              {retrying ? 'Checking…' : 'Try Again'}
+            </Button>
+          </>
+        )}
 
-        <Button
-          size="lg"
-          onClick={onStartCall}
-          className="mt-6 min-w-[280px] cursor-pointer rounded-full px-8 py-3 font-mono text-xs font-bold tracking-wider uppercase sm:min-w-[320px]"
-        >
-          {startButtonText}
-        </Button>
+        {/* ── CONNECTING ───────────────────────────────────────────── */}
+        {!micError && viewState === 'connecting' && (
+          <>
+            <HealthcareIcon />
+            <h1 className="text-foreground text-lg font-semibold tracking-tight">
+              Connecting to Swasthya Bharat…
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Please wait while we connect you.
+            </p>
+            <PulsingDots />
+            <Button
+              id="start-call-button"
+              size="lg"
+              disabled
+              className="mt-6 min-w-[280px] cursor-not-allowed rounded-full px-8 py-3 font-mono text-xs font-bold tracking-wider uppercase opacity-50 sm:min-w-[320px]"
+            >
+              Connecting…
+            </Button>
+          </>
+        )}
 
-        <p className="text-muted-foreground mt-4 text-xs">
-          આયુષ્માન PM-JAY કાર્ડ, ABHA હેલ્થ ID, સરકારી હોસ્પિટલ અને સ્વાસ્થ્ય સેવાની માહિતી માટે પૂછો
-        </p>
+        {/* ── CALL ENDED ───────────────────────────────────────────── */}
+        {!micError && viewState === 'ended' && (
+          <>
+            <HealthcareIcon />
+            <h1 className="text-foreground text-lg font-semibold tracking-tight">
+              Conversation Ended
+            </h1>
+            <p className="text-muted-foreground mt-2 text-sm">
+              Thank you for speaking with Swasthya Bharat.
+            </p>
+            <Button
+              id="start-again-button"
+              size="lg"
+              onClick={handleStartCall}
+              className="mt-6 min-w-[280px] cursor-pointer rounded-full px-8 py-3 font-mono text-xs font-bold tracking-wider uppercase sm:min-w-[320px]"
+            >
+              Start Again
+            </Button>
+          </>
+        )}
+
+        {/* ── READY (default) ──────────────────────────────────────── */}
+        {!micError && viewState === 'ready' && (
+          <>
+            <HealthcareIcon />
+            <h1 className="text-foreground text-lg font-semibold tracking-tight">
+              Swasthya Bharat (સ્વાસ્થ્ય ભારત)
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Your AI Health Assistant • ગુજરાતી &amp; English
+            </p>
+            <p className="text-muted-foreground mt-0.5 text-xs font-medium">Ready to talk</p>
+
+            <Button
+              id="start-call-button"
+              size="lg"
+              onClick={handleStartCall}
+              className="mt-6 min-w-[280px] cursor-pointer rounded-full px-8 py-3 font-mono text-xs font-bold tracking-wider uppercase sm:min-w-[320px]"
+            >
+              {startButtonText}
+            </Button>
+
+            <p className="text-muted-foreground mt-4 text-xs leading-5">
+              આયુષ્માન PM-JAY કાર્ડ, ABHA હેલ્થ ID, સરકારી હોસ્પિટલ અને સ્વાસ્થ્ય સેવાની
+              માહિતી માટે પૂછો
+            </p>
+          </>
+        )}
       </section>
 
-      <div className="fixed bottom-5 left-0 flex w-full items-center justify-center">
-        <p className="text-muted-foreground max-w-prose text-xs leading-5 font-normal">
-          Need help getting set up? Check out the{' '}
-          <a
-            target="_blank"
-            rel="noopener noreferrer"
-            href="https://docs.livekit.io/agents/start/voice-ai/"
-            className="underline underline-offset-2"
-          >
-            Voice AI quickstart
-          </a>
-          .
+      {/* ── Healthcare Disclaimer (non-intrusive, fixed bottom) ──── */}
+      <div className="fixed bottom-5 left-0 flex w-full items-center justify-center px-4">
+        <p className="text-muted-foreground max-w-prose text-center text-xs leading-5 font-normal">
+          <strong>Disclaimer:</strong> Swasthya Bharat provides general health information and does
+          not replace professional medical advice.
         </p>
       </div>
     </div>

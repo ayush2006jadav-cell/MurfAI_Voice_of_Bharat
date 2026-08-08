@@ -33,10 +33,10 @@ export interface AppConfig {
 }
 
 export const APP_CONFIG_DEFAULTS: AppConfig = {
-  companyName: 'Swasthya Bharat (સ્વાસ્થ્ય ભારત)',
-  pageTitle: 'Swasthya Bharat — Health Access Voice AI (Gujarati & English)',
+  companyName: 'Swasthya Bharat — Your AI Health Assistant',
+  pageTitle: 'Swasthya Bharat — AI Health Voice Assistant (Gujarati & English)',
   pageDescription:
-    'Your friendly health access voice assistant fluent in Gujarati (ગુજરાતી) and English, assisting with government health schemes and local health centers.',
+    'Your AI Health Assistant fluent in Gujarati (ગુજરાતી) and English. Ask about government health schemes, ABHA Health ID, Ayushman PM-JAY, and local health centers.',
 
   supportsChatInput: true,
   supportsVideoInput: true,
@@ -47,7 +47,7 @@ export const APP_CONFIG_DEFAULTS: AppConfig = {
   accent: '#0EA5E9',
   logoDark: '/murf-logo-dark.svg',
   accentDark: '#38bdf8',
-  startButtonText: 'Start Talking / વાત શરૂ કરો',
+  startButtonText: 'Start Conversation / વાત શરૂ કરો',
 
   // optional: audio visualization configuration
   // audioVisualizerType: 'bar',

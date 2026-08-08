@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, type MotionProps, motion } from 'motion/react';
-import { useAgent, useSessionContext, useSessionMessages } from '@livekit/components-react';
+import { useAgent, useSessionContext, useSessionMessages, useVoiceAssistant } from '@livekit/components-react';
 import { AgentChatTranscript } from '@/components/agents-ui/agent-chat-transcript';
 import {
   AgentControlBar,
@@ -13,6 +13,47 @@ import { cn } from '@/lib/shadcn/utils';
 import { TileLayout } from './tile-view';
 
 const MotionMessage = motion.create(Shimmer);
+
+// ─── Speaking/Listening state banner ─────────────────────────────────────────
+function AgentStateBanner() {
+  const { state: agentState } = useVoiceAssistant();
+
+  // Map LiveKit agent states to user-facing labels
+  const isSpeaking = agentState === 'speaking';
+  const isListening = agentState === 'listening';
+  const isThinking = agentState === 'thinking';
+
+  // Only show when there is something meaningful to show
+  if (!isSpeaking && !isListening && !isThinking) return null;
+
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={agentState}
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        className="absolute top-16 left-1/2 z-50 -translate-x-1/2"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tracking-wide',
+            isSpeaking
+              ? 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300'
+              : 'bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300'
+          )}
+        >
+          {isSpeaking && <>🔊 Swasthya Bharat is speaking…</>}
+          {isListening && <>🎙️ Listening to you…</>}
+          {isThinking && <>🤔 Thinking…</>}
+        </span>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
 
 const BOTTOM_VIEW_MOTION_PROPS: MotionProps = {
   variants: {
@@ -156,7 +197,7 @@ export interface AgentSessionView_01Props {
 }
 
 export function AgentSessionView_01({
-  preConnectMessage = 'Agent is listening, ask it a question',
+  preConnectMessage = 'Swasthya Bharat is ready — ask your health question',
   supportsChatInput = true,
   supportsVideoInput = true,
   supportsScreenShare = true,
@@ -205,6 +246,8 @@ export function AgentSessionView_01({
       {...props}
     >
       <Fade top className="absolute inset-x-4 top-0 z-10 h-40" />
+      {/* Agent state banner: shows LISTENING or SPEAKING */}
+      <AgentStateBanner />
       {/* transcript */}
 
       <div className="absolute top-0 bottom-[135px] flex w-full flex-col md:bottom-[170px]">

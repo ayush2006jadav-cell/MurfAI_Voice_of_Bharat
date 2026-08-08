@@ -1,13 +1,13 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { AnimatePresence, motion } from 'motion/react';
 import { useSessionContext } from '@livekit/components-react';
 import type { AppConfig } from '@/app-config';
 import { AgentSessionView_01 } from '@/components/agents-ui/blocks/agent-session-view-01';
-import { WelcomeView } from '@/components/app/welcome-view';
+import { WelcomeView, type WelcomeState } from '@/components/app/welcome-view';
 
-const MotionWelcomeView = motion.create(WelcomeView);
 const MotionSessionView = motion.create(AgentSessionView_01);
 
 const VIEW_MOTION_PROPS = {
@@ -24,9 +24,9 @@ const VIEW_MOTION_PROPS = {
   exit: 'hidden',
   transition: {
     duration: 0.5,
-    ease: 'linear',
+    ease: 'linear' as const,
   },
-};
+} as const;
 
 interface ViewControllerProps {
   appConfig: AppConfig;
@@ -36,18 +36,48 @@ export function ViewController({ appConfig }: ViewControllerProps) {
   const { isConnected, start } = useSessionContext();
   const { resolvedTheme } = useTheme();
 
+  // Track pre-session state: ready | connecting | ended
+  const [welcomeState, setWelcomeState] = useState<WelcomeState>('ready');
+  const wasConnectedRef = useRef(false);
+
+  useEffect(() => {
+    if (isConnected) {
+      wasConnectedRef.current = true;
+      // While connected the session view is shown, not the welcome view
+    } else {
+      // Not connected — figure out why
+      if (wasConnectedRef.current) {
+        // Was connected before → call ended
+        setWelcomeState('ended');
+        wasConnectedRef.current = false;
+      }
+      // If welcomeState is 'connecting' and we're not connected yet, keep it as 'connecting'
+      // The connecting state is set when the user presses start (handled below)
+    }
+  }, [isConnected]);
+
+  const handleStart = () => {
+    setWelcomeState('connecting');
+    start();
+  };
+
   return (
     <AnimatePresence mode="wait">
-      {/* Welcome view */}
+      {/* Welcome / Connecting / Ended view */}
       {!isConnected && (
-        <MotionWelcomeView
+        <motion.div
           key="welcome"
           {...VIEW_MOTION_PROPS}
-          startButtonText={appConfig.startButtonText}
-          onStartCall={start}
-        />
+          className="contents"
+        >
+          <WelcomeView
+            startButtonText={appConfig.startButtonText}
+            onStartCall={handleStart}
+            viewState={welcomeState}
+          />
+        </motion.div>
       )}
-      {/* Session view */}
+      {/* Active session view */}
       {isConnected && (
         <MotionSessionView
           key="session-view"

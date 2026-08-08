@@ -97,16 +97,8 @@ export default async function RootLayout({ children }: RootLayoutProps) {
                 {companyName}
               </span>
             </div>
-            <span className="text-foreground font-mono text-xs font-bold tracking-wider uppercase">
-              Built with{' '}
-              <a
-                target="_blank"
-                rel="noopener noreferrer"
-                href="https://docs.livekit.io/agents"
-                className="underline underline-offset-4"
-              >
-                LiveKit Agents
-              </a>
+            <span className="text-muted-foreground font-mono text-xs font-bold tracking-wider uppercase">
+              AI Health Assistant
             </span>
           </header>
 
