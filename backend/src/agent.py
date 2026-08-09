@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 
@@ -9,12 +10,16 @@ from livekit.agents import (
     AgentSession,
     JobContext,
     JobProcess,
+    RunContext,
     cli,
+    function_tool,
     room_io,
     tokenize,
 )
 from livekit.plugins import deepgram, google, murf, noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
+
+import memory
 
 logger = logging.getLogger("agent")
 
@@ -58,14 +63,124 @@ Key Responsibilities:
 3. Voice-Optimized Delivery:
    - Keep replies concise, helpful, and natural (1 to 3 spoken sentences per turn).
    - Never use markdown formatting (no asterisks, bolding, bullet points), emojis, or special symbols, because your output is converted directly to speech.
-   - Use clear, simple phrasing with proper punctuation for natural speech flow."""
+   - Use clear, simple phrasing with proper punctuation for natural speech flow.
+
+CALLER MEMORY & CONSENT RULES (these are secondary to all healthcare safety constraints above):
+
+At the start of every conversation you will receive the caller's user_id.
+
+Step 1 — Lookup:
+- Call the lookup_caller tool with the provided user_id immediately.
+- If a record is found, greet the caller by their saved name and use their saved language preference and facts to provide continuity. Only reference information that is actually in the record.
+- If no record is found, treat the caller as new. Do not invent prior interactions.
+
+Step 2 — Learning new information:
+- During the conversation you may learn the caller's name, language preference, or a small number of relevant health facts (age band, ongoing condition, last triage outcome — never full medical notes or conversation transcripts).
+- Before saving ANY new information, always ask for the caller's explicit consent. Example: "Would you like me to remember your name and language preference for future conversations?" or "Would you like me to remember that you prefer Hindi for future conversations?"
+- Wait for a clear YES before calling save_caller_memory.
+- If the caller says NO or is unclear, do NOT call save_caller_memory for that information.
+- Never assume consent from silence or from the caller simply providing information.
+- Never save complete medical conversations, detailed medical histories, or written-out medical notes.
+- Only save a maximum of 3 to 4 minimum structured facts that are useful for future Health Access conversations.
+
+Step 3 — Saving:
+- Only after receiving explicit YES consent, call save_caller_memory with the approved information.
+- The user_id to use is the one provided at the start of the conversation.
+
+Step 4 — Privacy:
+- Never reveal one caller's memory to a different caller.
+- Never invent memories or facts that are not in the database.
+- These memory rules never override healthcare safety constraints."""
 
 
 class Assistant(Agent):
-    def __init__(self) -> None:
-        super().__init__(instructions=SYSTEM_PROMPT)
+    def __init__(self, user_id: str) -> None:
+        # Inject the caller's user_id into the system instructions so the LLM
+        # knows which ID to pass to the memory tools.
+        instructions = (
+            SYSTEM_PROMPT
+            + f"\n\nThe caller's user_id for this conversation is: {user_id!r}. "
+            "Use this exact value when calling lookup_caller or save_caller_memory."
+        )
+        super().__init__(instructions=instructions)
+        self._user_id = user_id
 
-    # To add tools, use the @function_tool decorator.
+    @function_tool
+    async def lookup_caller(
+        self,
+        context: RunContext,
+        user_id: str,
+    ) -> str:
+        """Look up an existing caller's saved memory by their user_id.
+
+        Call this at the very start of every conversation to check whether the
+        caller has an existing record. Returns their name, language preference,
+        saved health facts, and last interaction timestamp if found.
+
+        Args:
+            user_id: The caller's unique identifier for this conversation.
+        """
+        logger.info("lookup_caller called for user_id=%r", user_id)
+        record = memory.lookup_caller(user_id)
+        if record is None:
+            return "No existing record found for this caller. Treat them as a new caller."
+        return (
+            f"Caller found. Name: {record['name']!r}, "
+            f"Language preference: {record['language_preference']!r}, "
+            f"Facts: {json.dumps(record['facts'], ensure_ascii=False)}, "
+            f"Last interaction: {record['last_interaction']!r}."
+        )
+
+    @function_tool
+    async def save_caller_memory(
+        self,
+        context: RunContext,
+        user_id: str,
+        name: str | None,
+        language_preference: str | None,
+        facts: str | None,
+    ) -> str:
+        """Save or update the caller's memory record ONLY after they have given
+        explicit YES consent to having their information remembered.
+
+        NEVER call this tool without first asking the caller and receiving a
+        clear YES. If the caller said NO or did not clearly consent, do not
+        call this tool.
+
+        Args:
+            user_id: The caller's unique identifier.
+            name: The caller's name (or None to leave unchanged).
+            language_preference: The caller's preferred language (or None).
+            facts: A JSON string of up to 4 structured health facts, e.g.
+                   '{"age_band": "40-49", "ongoing_condition": "diabetes",
+                    "last_triage_outcome": "recommended doctor consultation"}'
+                   Only include keys relevant to future Health Access conversations.
+                   Do NOT include full medical notes, diagnoses, or transcripts.
+        """
+        logger.info(
+            "save_caller_memory called for user_id=%r name=%r lang=%r",
+            user_id,
+            name,
+            language_preference,
+        )
+        # Parse facts from JSON string if provided
+        parsed_facts: dict | None = None
+        if facts:
+            try:
+                parsed_facts = json.loads(facts)
+            except json.JSONDecodeError:
+                logger.warning("save_caller_memory: invalid JSON in facts=%r", facts)
+                parsed_facts = None
+
+        memory.save_caller_memory(
+            user_id=user_id,
+            name=name,
+            language_preference=language_preference,
+            facts=parsed_facts,
+        )
+        return f"Memory saved successfully for caller {user_id!r}."
+
+    # To add more tools, use the @function_tool decorator.
     # Here's an example that adds a simple weather tool.
     # You also have to add `from livekit.agents import function_tool, RunContext` to the top of this file
     # @function_tool
@@ -100,6 +215,22 @@ async def my_agent(ctx: JobContext):
     ctx.log_context_fields = {
         "room": ctx.room.name,
     }
+
+    # Initialise persistent memory DB (no-op if already created)
+    memory.init_db()
+
+    # Derive a stable user_id from the first human participant's identity.
+    # The frontend sets participantIdentity = 'voice_assistant_user_<RAND>' which
+    # is unique per session. We use it as a session-scoped fallback; the agent
+    # will ask the caller to identify themselves for cross-session persistence
+    # (per Option A agreed with the user).
+    user_id = "anonymous"
+    for identity, _participant in ctx.room.remote_participants.items():
+        # Pick the first non-agent participant
+        if identity and not identity.startswith("agent"):
+            user_id = identity
+            break
+    logger.info("Session user_id resolved to: %r", user_id)
 
     # Set up a voice AI pipeline using Murf Falcon, Gemini, Deepgram, and the LiveKit turn detector
     session = AgentSession(
@@ -147,7 +278,7 @@ async def my_agent(ctx: JobContext):
 
     # Start the session, which initializes the voice pipeline and warms up the models
     await session.start(
-        agent=Assistant(),
+        agent=Assistant(user_id=user_id),
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
