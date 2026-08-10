@@ -240,6 +240,22 @@ Tests evaluate critical agent behaviors including welcoming users in Gujarati/En
 - 📝 [Deepgram Speech Recognition](https://developers.deepgram.com)
 - 🤖 [Google Gemini AI](https://ai.google.dev/)
 - 🏥 [Ayushman Bharat PM-JAY Portal](https://pmjay.gov.in/)
+- 🗺️ [OpenStreetMap](https://www.openstreetmap.org/) (Data source for nearby healthcare facility lookup — © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright))
+- ⚡ [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API) (Real-time geographic query API for OSM healthcare data)
+- 📍 [OpenStreetMap Nominatim](https://nominatim.openstreetmap.org/) (Geocoding engine for location name resolution)
+
+---
+
+## 🗺️ Real Healthcare Facility Lookup (OpenStreetMap & Overpass API)
+
+Swasthya Bharat includes a real-domain function tool (`find_nearest_healthcare_facility`) that queries live geographic data directly from **OpenStreetMap** using the **Overpass API**.
+
+### Key Capabilities:
+- **Real-Time Data**: Queries real OSM nodes, ways, and relations for `amenity=hospital`, `amenity=clinic`, `amenity=doctors`, `amenity=health_post`, and `healthcare=*` tags.
+- **Geocoding Support**: Uses OpenStreetMap Nominatim to resolve place names (e.g., "Ahmedabad", "Surat", "Paldi") to precise latitude and longitude coordinates when GPS coordinates are unavailable.
+- **Geographic Distance Calculation**: Computes exact great-circle distance using the Haversine formula and returns the nearest facilities sorted by distance.
+- **Data Freshness & Disclaimers**: Includes data retrieval timestamps (`queried_at`) and OSM data timestamps (`data_timestamp`). Advises users that data is community-maintained and should be verified before travelling.
+- **Privacy & Safety First**: Coordinates and full addresses are **never** saved to persistent SQLite caller memory, and emergency safety rules strictly take precedence.
 
 ---
 

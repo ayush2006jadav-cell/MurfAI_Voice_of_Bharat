@@ -5,10 +5,9 @@ These tests exercise the SQLite memory helpers directly (no LiveKit infrastructu
 They use a temporary in-memory / temp-file database so they never touch production data.
 """
 
-import json
 import os
 import sys
-import tempfile
+
 import pytest
 
 # ---------------------------------------------------------------------------
@@ -102,10 +101,12 @@ def test_update_caller_memory_merges_facts():
 
     record = mem.lookup_caller(uid)
     assert record is not None
-    assert record["name"] == "Vijay"               # preserved from first save
+    assert record["name"] == "Vijay"  # preserved from first save
     assert record["language_preference"] == "Gujarati"  # preserved
     assert record["facts"]["age_band"] == "30-39"  # preserved
-    assert record["facts"]["last_triage_outcome"] == "recommended doctor consultation"  # newly added
+    assert (
+        record["facts"]["last_triage_outcome"] == "recommended doctor consultation"
+    )  # newly added
 
 
 # ===========================================================================
@@ -114,7 +115,9 @@ def test_update_caller_memory_merges_facts():
 def test_facts_persist_across_init(isolated_db):
     """Calling init_db() again (simulating a restart) must not wipe existing rows."""
     uid = "meena_persistence"
-    mem.save_caller_memory(uid, name="Meena", language_preference="English", facts={"age_band": "50-59"})
+    mem.save_caller_memory(
+        uid, name="Meena", language_preference="English", facts={"age_band": "50-59"}
+    )
 
     # Simulate restart: call init_db() again (CREATE TABLE IF NOT EXISTS is idempotent)
     mem.init_db()
@@ -136,7 +139,9 @@ def test_only_structured_facts_stored():
         "ongoing_condition": "asthma",
         "last_triage_outcome": "recommended PHC visit",
     }
-    mem.save_caller_memory(uid, name="Ananya", language_preference="English", facts=structured_facts)
+    mem.save_caller_memory(
+        uid, name="Ananya", language_preference="English", facts=structured_facts
+    )
 
     record = mem.lookup_caller(uid)
     stored_facts = record["facts"]
@@ -156,7 +161,9 @@ def test_only_structured_facts_stored():
 def test_returning_caller_name_available_for_greeting():
     """When a returning caller is looked up, their name is available for a personalised greeting."""
     uid = "suresh_returning"
-    mem.save_caller_memory(uid, name="Suresh", language_preference="Gujarati", facts={"age_band": "60-69"})
+    mem.save_caller_memory(
+        uid, name="Suresh", language_preference="Gujarati", facts={"age_band": "60-69"}
+    )
 
     record = mem.lookup_caller(uid)
     assert record is not None
@@ -171,7 +178,9 @@ def test_returning_caller_name_available_for_greeting():
 # ===========================================================================
 def test_user_id_normalised():
     """user_id should be lowercased and stripped of surrounding whitespace."""
-    mem.save_caller_memory("  Alice_007  ", name="Alice", language_preference="English", facts={})
+    mem.save_caller_memory(
+        "  Alice_007  ", name="Alice", language_preference="English", facts={}
+    )
     assert mem.lookup_caller("alice_007") is not None
     assert mem.lookup_caller("  Alice_007  ") is not None
 

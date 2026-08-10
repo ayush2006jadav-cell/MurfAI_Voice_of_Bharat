@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -19,6 +20,7 @@ from livekit.agents import (
 from livekit.plugins import deepgram, google, murf, noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
+import facility_lookup
 import memory
 
 logger = logging.getLogger("agent")
@@ -90,11 +92,19 @@ Step 3 — Saving:
 Step 4 — Privacy:
 - Never reveal one caller's memory to a different caller.
 - Never invent memories or facts that are not in the database.
-- These memory rules never override healthcare safety constraints."""
+- These memory rules never override healthcare safety constraints.
+
+HEALTHCARE FACILITY LOOKUP RULES:
+- When the user asks for a nearby hospital, clinic, doctor, health centre, or PHC, call the find_nearest_healthcare_facility tool.
+- The tool requires the user's location (latitude and longitude, or a city/locality name). If location is unavailable, ask the user for their city or area before calling the tool.
+- Explain that facility information comes from OpenStreetMap community data and advise verifying details before travelling (e.g., "I found nearby healthcare facilities using OpenStreetMap data. Please verify availability and services before travelling.").
+- Never state facilities are currently open unless opening_hours data is explicitly provided in the tool response.
+- Never state a hospital definitely has emergency services unless the emergency tag explicitly indicates emergency availability.
+- Privacy rule: Never save the user's GPS coordinates, latitude, longitude, or address into persistent caller memory."""
 
 
 class Assistant(Agent):
-    def __init__(self, user_id: str) -> None:
+    def __init__(self, user_id: str = "anonymous") -> None:
         # Inject the caller's user_id into the system instructions so the LLM
         # knows which ID to pass to the memory tools.
         instructions = (
@@ -123,7 +133,9 @@ class Assistant(Agent):
         logger.info("lookup_caller called for user_id=%r", user_id)
         record = memory.lookup_caller(user_id)
         if record is None:
-            return "No existing record found for this caller. Treat them as a new caller."
+            return (
+                "No existing record found for this caller. Treat them as a new caller."
+            )
         return (
             f"Caller found. Name: {record['name']!r}, "
             f"Language preference: {record['language_preference']!r}, "
@@ -179,6 +191,71 @@ class Assistant(Agent):
             facts=parsed_facts,
         )
         return f"Memory saved successfully for caller {user_id!r}."
+
+    @function_tool
+    async def find_nearest_healthcare_facility(
+        self,
+        context: RunContext,
+        latitude: float = 0.0,
+        longitude: float = 0.0,
+        facility_type: str = "any",
+        radius_km: float = 10.0,
+        limit: int = 3,
+        location_name: str | None = None,
+    ) -> str:
+        """Find real healthcare facilities near the user's current location using OpenStreetMap geographic data. Use this tool when the user asks for a nearby hospital, clinic, doctor, health centre, PHC, healthcare facility, or where they can seek in-person medical care. Do not use this tool for general medical questions that do not require a physical healthcare facility. Never invent facility names or locations. The tool requires the user's latitude and longitude. If location is unavailable, ask the user for their city, area, or location before calling the tool.
+
+        Args:
+            latitude: The user's latitude (e.g. 23.0225). Pass 0.0 if unknown.
+            longitude: The user's longitude (e.g. 72.5714). Pass 0.0 if unknown.
+            facility_type: Specific facility type requested ("hospital", "clinic", "doctor", "health_post", or "any").
+            radius_km: Search radius in kilometers (default 10.0).
+            limit: Maximum number of facilities to return (default 3).
+            location_name: City, locality, or place name if lat/lon are not directly available (e.g. "Ahmedabad", "Surat").
+        """
+        logger.info(
+            "find_nearest_healthcare_facility called: lat=%r lon=%r type=%r radius=%r loc=%r",
+            latitude,
+            longitude,
+            facility_type,
+            radius_km,
+            location_name,
+        )
+
+        if latitude == 0.0 and longitude == 0.0:
+            if location_name and location_name.strip():
+                coords = await asyncio.to_thread(
+                    facility_lookup.geocode_location, location_name
+                )
+                if coords is None:
+                    return json.dumps(
+                        {
+                            "success": False,
+                            "error": "location_not_found",
+                            "message": f"I couldn't find geographic coordinates for '{location_name}'. Please ask the user to clarify their city or area.",
+                        },
+                        ensure_ascii=False,
+                    )
+                latitude, longitude = coords
+            else:
+                return json.dumps(
+                    {
+                        "success": False,
+                        "error": "missing_location",
+                        "message": "I can find nearby healthcare facilities, but I need your current city or location first.",
+                    },
+                    ensure_ascii=False,
+                )
+
+        result = await asyncio.to_thread(
+            facility_lookup.query_overpass_facilities,
+            latitude=latitude,
+            longitude=longitude,
+            facility_type=facility_type,
+            radius_km=radius_km,
+            limit=limit,
+        )
+        return json.dumps(result, ensure_ascii=False)
 
     # To add more tools, use the @function_tool decorator.
     # Here's an example that adds a simple weather tool.

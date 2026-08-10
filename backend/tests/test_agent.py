@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from livekit.agents import AgentSession, inference, llm
 
@@ -165,3 +167,102 @@ async def test_emergency_situation_handling() -> None:
         )
 
         result.expect.no_more_events()
+
+
+@pytest.mark.asyncio
+async def test_facility_lookup_tool_direct_call() -> None:
+    """Test Assistant.find_nearest_healthcare_facility tool directly with coordinates."""
+    from unittest.mock import MagicMock, patch
+
+    assistant = Assistant(user_id="test_user_facility")
+
+    mock_overpass_resp = {
+        "osm3s": {"timestamp_osm_base": "2026-08-10T15:00:00Z"},
+        "elements": [
+            {
+                "type": "node",
+                "id": 1,
+                "lat": 23.0300,
+                "lon": 72.5714,
+                "tags": {
+                    "amenity": "hospital",
+                    "name": "Apollo Hospital Ahmedabad",
+                    "emergency": "yes",
+                },
+            }
+        ],
+    }
+
+    with patch("urllib.request.urlopen") as mock_urlopen:
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.read.return_value = json.dumps(mock_overpass_resp).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_resp
+
+        res_str = await assistant.find_nearest_healthcare_facility(
+            context=None,
+            latitude=23.0225,
+            longitude=72.5714,
+            facility_type="hospital",
+            radius_km=10.0,
+            limit=3,
+        )
+
+        res = json.loads(res_str)
+        assert res["success"] is True
+        assert res["source"] == "OpenStreetMap"
+        assert len(res["facilities"]) == 1
+        assert res["facilities"][0]["name"] == "Apollo Hospital Ahmedabad"
+        assert res["facilities"][0]["emergency"] == "yes"
+
+
+@pytest.mark.asyncio
+async def test_facility_lookup_tool_missing_location() -> None:
+    """Test Assistant.find_nearest_healthcare_facility returns missing_location error when coordinates are 0.0."""
+    assistant = Assistant(user_id="test_user_facility")
+
+    res_str = await assistant.find_nearest_healthcare_facility(
+        context=None,
+        latitude=0.0,
+        longitude=0.0,
+    )
+
+    res = json.loads(res_str)
+    assert res["success"] is False
+    assert res["error"] == "missing_location"
+
+
+@pytest.mark.asyncio
+async def test_facility_lookup_tool_geocoding_location_name() -> None:
+    """Test Assistant.find_nearest_healthcare_facility geocodes city string if lat/lon are 0.0."""
+    from unittest.mock import patch
+
+    assistant = Assistant(user_id="test_user_facility")
+
+    with (
+        patch("facility_lookup.geocode_location", return_value=(23.0225, 72.5714)),
+        patch(
+            "facility_lookup.query_overpass_facilities",
+            return_value={
+                "success": True,
+                "source": "OpenStreetMap",
+                "facilities": [
+                    {
+                        "name": "Ahmedabad Civil Hospital",
+                        "type": "hospital",
+                        "distance_km": 1.2,
+                    }
+                ],
+            },
+        ),
+    ):
+        res_str = await assistant.find_nearest_healthcare_facility(
+            context=None,
+            latitude=0.0,
+            longitude=0.0,
+            location_name="Ahmedabad",
+        )
+
+        res = json.loads(res_str)
+        assert res["success"] is True
+        assert res["facilities"][0]["name"] == "Ahmedabad Civil Hospital"

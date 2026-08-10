@@ -227,9 +227,13 @@ docker run --env-file .env.local murf-voice-agent
 ```
 backend/
 ├── src/
-│   └── agent.py          # Agent entrypoint — pipeline, prompt, config
+│   ├── agent.py          # Agent entrypoint — pipeline, prompt, tools, config
+│   ├── facility_lookup.py # OpenStreetMap Overpass API & Nominatim geocoding
+│   └── memory.py         # Persistent caller memory helper (SQLite)
 ├── tests/
-│   └── test_agent.py     # LLM-judged eval suite
+│   ├── test_agent.py     # LLM-judged eval suite & tool integration tests
+│   ├── test_facility_lookup.py # Unit tests for Overpass API & geocoding
+│   └── test_memory.py    # Unit tests for caller memory DB
 ├── .env.example           # Environment variable template
 ├── pyproject.toml         # Python dependencies (uv)
 ├── Dockerfile             # Production container
@@ -242,6 +246,9 @@ backend/
 - [Murf Voice Library](https://murf.ai/api/docs/voices-styles/voice-library)
 - [LiveKit Agents Docs](https://docs.livekit.io/agents)
 - [Deepgram Nova-3 Docs](https://developers.deepgram.com)
+- [OpenStreetMap](https://www.openstreetmap.org/copyright) (Data source for nearby healthcare facility lookup — © OpenStreetMap contributors)
+- [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API) (Real-time geographic query API for OSM healthcare data)
+- [OpenStreetMap Nominatim](https://nominatim.openstreetmap.org/) (Geocoding engine for location name resolution)
 
 ## License
 

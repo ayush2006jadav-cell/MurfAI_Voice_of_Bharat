@@ -95,7 +95,11 @@ def save_caller_memory(
     existing = lookup_caller(uid)
 
     merged_name = name if name is not None else (existing or {}).get("name")
-    merged_lang = language_preference if language_preference is not None else (existing or {}).get("language_preference")
+    merged_lang = (
+        language_preference
+        if language_preference is not None
+        else (existing or {}).get("language_preference")
+    )
     merged_facts = (existing or {}).get("facts", {}) if existing else {}
     if facts:
         merged_facts.update(facts)
