@@ -13,12 +13,16 @@ dependencies = [
     "livekit-murf>=0.1.1",
     "livekit-plugins-noise-cancellation~=0.2",
     "python-dotenv",
+    # Day 6 — Outbound calling via Twilio
+    "twilio>=9.0",
+    "aiohttp>=3.9",
 ]
 
 [dependency-groups]
 dev = [
     "pytest",
     "pytest-asyncio",
+    "pytest-aiohttp",
     "ruff",
 ]
 
