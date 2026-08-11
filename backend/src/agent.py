@@ -94,13 +94,38 @@ Step 4 — Privacy:
 - Never invent memories or facts that are not in the database.
 - These memory rules never override healthcare safety constraints.
 
-HEALTHCARE FACILITY LOOKUP RULES:
-- When the user asks for a nearby hospital, clinic, doctor, health centre, or PHC, call the find_nearest_healthcare_facility tool.
-- The tool requires the user's location (latitude and longitude, or a city/locality name). If location is unavailable, ask the user for their city or area before calling the tool.
-- Explain that facility information comes from OpenStreetMap community data and advise verifying details before travelling (e.g., "I found nearby healthcare facilities using OpenStreetMap data. Please verify availability and services before travelling.").
-- Never state facilities are currently open unless opening_hours data is explicitly provided in the tool response.
-- Never state a hospital definitely has emergency services unless the emergency tag explicitly indicates emergency availability.
-- Privacy rule: Never save the user's GPS coordinates, latitude, longitude, or address into persistent caller memory."""
+- Privacy rule: Never save the user's GPS coordinates, latitude, longitude, or address into persistent caller memory.
+
+HUMAN HELP & ESCALATION RULES (DAY 7):
+Create a human-help request ONLY when the caller either reports potentially life-threatening symptoms or explicitly asks for a medical diagnosis, AND ONLY after the caller has explicitly consented to sharing a short summary with a human support team. Do not call create_escalation for normal health questions or without explicit consent.
+
+Situation 1 — Red-flag / Life-threatening Symptoms:
+1. ALWAYS give existing emergency safety guidance FIRST (contact emergency services or go to nearest emergency department).
+2. AFTER emergency guidance, offer human escalation: "If you would like, I can also send a short summary of this conversation to a human support team. Would you like me to do that?"
+3. Explain what will be shared (name, what happened, what was checked, urgency='urgent', language preference).
+4. Wait for explicit YES consent before calling create_escalation with urgency="urgent" and reason="emergency_red_flags".
+5. If the user says NO, do NOT call create_escalation.
+
+Situation 2 — User Asks for a Medical Diagnosis:
+1. Refuse diagnosis immediately ("I cannot diagnose a medical condition. I can provide general health information, or I can ask for human assistance if you'd like.").
+2. Ask if they would like human assistance: "Would you like me to send a short summary to a human support team?"
+3. Explain what will be shared (name, what happened, what was checked, urgency='normal', language preference).
+4. Wait for explicit YES consent before calling create_escalation with urgency="normal" and reason="diagnosis_request".
+5. If the user says NO, do NOT call create_escalation.
+
+Mandatory Consent & Privacy Constraints:
+- NEVER call create_escalation without receiving an explicit YES from the user.
+- If the caller says NO or is silent, do NOT call create_escalation.
+- NEVER call create_escalation for general health questions, facility lookups, or normal conversations.
+- NEVER store passwords, OTPs, PINs, bank details, API keys, full conversation transcripts, or detailed medical notes in the summary.
+
+Post-Escalation Response:
+- After create_escalation returns a reference ID (e.g. ESC-2026-001), state clearly:
+  1. The human support request has been created.
+  2. Provide their reference ID (e.g., ESC-2026-001).
+  3. Explain that a human support team can review the information they approved.
+  4. Do NOT promise an immediate response.
+  5. For urgent situations, remind them that emergency care takes priority over waiting for human support."""
 
 
 class Assistant(Agent):
@@ -256,6 +281,54 @@ class Assistant(Agent):
             limit=limit,
         )
         return json.dumps(result, ensure_ascii=False)
+
+    @function_tool
+    async def create_escalation(
+        self,
+        context: RunContext,
+        user_id: str,
+        reason: str,
+        what_happened: str,
+        agent_checked: str,
+        urgency: str = "normal",
+        name: str | None = None,
+        language: str | None = None,
+        follow_up_method: str | None = "phone",
+    ) -> str:
+        """Create a human-help request when the caller either reports potentially life-threatening symptoms or explicitly asks for a medical diagnosis, but ONLY after the caller has explicitly consented to sharing a short summary with a human support team. Do not call this function for normal health questions or without explicit consent.
+
+        Args:
+            user_id: The caller's unique identifier.
+            reason: Reason for escalation ("emergency_red_flags" or "diagnosis_request").
+            what_happened: Concise description of what caller reported (e.g., "Caller reported chest pain and difficulty breathing").
+            agent_checked: Summary of what agent checked/advised (e.g., "Advised emergency services immediately").
+            urgency: Urgency level ("urgent" for emergency symptoms, "normal" for diagnosis requests).
+            name: Caller's name if provided/consented.
+            language: Preferred language (e.g., "Gujarati", "English", "Hindi").
+            follow_up_method: Preferred follow-up channel ("phone", "app", etc.).
+        """
+        logger.info(
+            "create_escalation called for user_id=%r reason=%r urgency=%r",
+            user_id,
+            reason,
+            urgency,
+        )
+        record = memory.create_escalation_record(
+            user_id=user_id,
+            reason=reason,
+            what_happened=what_happened,
+            agent_checked=agent_checked,
+            urgency=urgency,
+            name=name,
+            language=language,
+            follow_up_method=follow_up_method,
+        )
+        ref_id = record["reference_id"]
+        return (
+            f"Escalation request created successfully. "
+            f"Reference ID: {ref_id}. Urgency: {record['urgency']}. "
+            "Please inform the caller of their Reference ID."
+        )
 
     # To add more tools, use the @function_tool decorator.
     # Here's an example that adds a simple weather tool.

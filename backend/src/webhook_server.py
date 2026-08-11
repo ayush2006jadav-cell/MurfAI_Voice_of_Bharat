@@ -497,6 +497,152 @@ async def handle_follow_up_call(request: web.Request) -> web.Response:
 
 
 # ---------------------------------------------------------------------------
+# Day 7 — Escalation Dashboard Routes
+# ---------------------------------------------------------------------------
+
+
+async def handle_get_escalations(request: web.Request) -> web.Response:
+    """GET /api/escalations — Return JSON list of escalation requests."""
+    status = request.query.get("status")
+    items = memory.list_escalations(status=status)
+    return web.json_response({"success": True, "escalations": items})
+
+
+async def handle_update_escalation_status(request: web.Request) -> web.Response:
+    """POST /api/escalations/status — Update status of an escalation request."""
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response(
+            {"success": False, "message": "Invalid JSON in request body."},
+            status=400,
+        )
+
+    ref_id = str(data.get("reference_id", "")).strip()
+    status = str(data.get("status", "")).strip()
+
+    if not ref_id or not status:
+        return web.json_response(
+            {"success": False, "message": "reference_id and status are required."},
+            status=400,
+        )
+
+    try:
+        updated = memory.update_escalation_status(ref_id, status)
+        if updated is None:
+            return web.json_response(
+                {"success": False, "message": f"Escalation {ref_id!r} not found."},
+                status=404,
+            )
+        return web.json_response({"success": True, "escalation": updated})
+    except ValueError as exc:
+        return web.json_response({"success": False, "message": str(exc)}, status=400)
+
+
+async def handle_dashboard(request: web.Request) -> web.Response:
+    """GET /dashboard — Simple HTML dashboard to view human escalation requests."""
+    items = memory.list_escalations()
+    rows_html = ""
+
+    for item in items:
+        urgency_bg = "#dc2626" if item["urgency"] == "urgent" else "#2563eb"
+        status_bg = (
+            "#eab308"
+            if item["status"] == "open"
+            else ("#3b82f6" if item["status"] == "in_progress" else "#16a34a")
+        )
+        name_disp = item["name"] or "Anonymous"
+        lang_disp = item["language"] or "N/A"
+        method_disp = item["follow_up_method"] or "phone"
+
+        rows_html += f"""
+        <tr>
+            <td style="font-weight:bold; font-family:monospace; color:#38bdf8;">{item["reference_id"]}</td>
+            <td><span style="background:{urgency_bg}; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;">{item["urgency"].upper()}</span></td>
+            <td><span style="background:{status_bg}; color:#000; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;">{item["status"].upper()}</span></td>
+            <td>{name_disp}</td>
+            <td>{item["reason"]}</td>
+            <td style="max-width:250px;">{item["what_happened"]}</td>
+            <td style="max-width:250px;">{item["agent_checked"]}</td>
+            <td>{lang_disp} / {method_disp}</td>
+            <td style="font-size:12px; color:#9ca3af;">{item["created_at"][:19]}</td>
+            <td>
+                <select onchange="updateStatus('{item["reference_id"]}', this.value)" style="background:#1e293b; color:#fff; border:1px solid #475569; border-radius:4px; padding:4px;">
+                    <option value="open" {"selected" if item["status"] == "open" else ""}>Open</option>
+                    <option value="in_progress" {"selected" if item["status"] == "in_progress" else ""}>In Progress</option>
+                    <option value="resolved" {"selected" if item["status"] == "resolved" else ""}>Resolved</option>
+                </select>
+            </td>
+        </tr>
+        """
+
+    if not rows_html:
+        rows_html = '<tr><td colspan="10" style="text-align:center; padding:30px; color:#9ca3af;">No escalation requests found.</td></tr>'
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Swasthya Bharat — Human Support Dashboard</title>
+    <style>
+        body {{ font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }}
+        h1 {{ font-size: 24px; margin-bottom: 8px; color: #38bdf8; display: flex; align-items: center; gap: 10px; }}
+        p {{ color: #94a3b8; margin-bottom: 24px; }}
+        table {{ width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }}
+        th, td {{ padding: 12px 16px; text-align: left; border-bottom: 1px solid #334155; }}
+        th {{ background: #0f172a; color: #94a3b8; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; }}
+        tr:hover {{ background: #283548; }}
+        .badge {{ display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 12px; }}
+    </style>
+</head>
+<body>
+    <h1>🏥 Swasthya Bharat — Human Support Dashboard</h1>
+    <p>View and manage escalation requests created when callers report emergency symptoms or request medical diagnosis.</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Ref ID</th>
+                <th>Urgency</th>
+                <th>Status</th>
+                <th>Caller Name</th>
+                <th>Reason</th>
+                <th>What Happened</th>
+                <th>Agent Checked</th>
+                <th>Lang / Method</th>
+                <th>Created At</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {rows_html}
+        </tbody>
+    </table>
+
+    <script>
+        async function updateStatus(refId, newStatus) {{
+            try {{
+                const res = await fetch('/api/escalations/status', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ reference_id: refId, status: newStatus }})
+                }});
+                const data = await res.json();
+                if (data.success) {{
+                    location.reload();
+                }} else {{
+                    alert('Error: ' + data.message);
+                }}
+            }} catch (err) {{
+                alert('Failed to update status: ' + err);
+            }}
+        }}
+    </script>
+</body>
+</html>"""
+    return web.Response(text=html, content_type="text/html")
+
+
+# ---------------------------------------------------------------------------
 # Server setup
 # ---------------------------------------------------------------------------
 
@@ -507,6 +653,9 @@ def create_app() -> web.Application:
     app.router.add_get("/api/tts", handle_tts)
     app.router.add_post("/api/twilio/voice", handle_twilio_voice)
     app.router.add_post("/api/follow-up-call", handle_follow_up_call)
+    app.router.add_get("/dashboard", handle_dashboard)
+    app.router.add_get("/api/escalations", handle_get_escalations)
+    app.router.add_post("/api/escalations/status", handle_update_escalation_status)
     return app
 
 
