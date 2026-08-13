@@ -25,7 +25,7 @@ function HealthcareIcon() {
 // Animated pulsing dots for connecting state
 function PulsingDots() {
   return (
-    <div className="flex items-center justify-center gap-1.5 mt-3" aria-hidden="true">
+    <div className="mt-3 flex items-center justify-center gap-1.5" aria-hidden="true">
       {[0, 1, 2].map((i) => (
         <span
           key={i}
@@ -52,7 +52,7 @@ function MicBlockedIcon() {
       viewBox="0 0 56 56"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="mb-4 size-14 text-destructive"
+      className="text-destructive mb-4 size-14"
       aria-hidden="true"
     >
       <circle cx="28" cy="28" r="26" stroke="currentColor" strokeWidth="2" opacity="0.2" />
@@ -64,9 +64,35 @@ function MicBlockedIcon() {
         strokeLinecap="round"
         opacity="0.45"
       />
-      <line x1="28" y1="40" x2="28" y2="46" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.45" />
-      <line x1="23" y1="46" x2="33" y2="46" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.45" />
-      <line x1="11" y1="11" x2="45" y2="45" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+      <line
+        x1="28"
+        y1="40"
+        x2="28"
+        y2="46"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        opacity="0.45"
+      />
+      <line
+        x1="23"
+        y1="46"
+        x2="33"
+        y2="46"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        opacity="0.45"
+      />
+      <line
+        x1="11"
+        y1="11"
+        x2="45"
+        y2="45"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -125,7 +151,6 @@ export const WelcomeView = ({
       {...rest}
     >
       <section className="bg-background flex max-w-md flex-col items-center justify-center text-center">
-
         {/* ── MICROPHONE PERMISSION ERROR ──────────────────────────── */}
         {micError && (
           <>
@@ -136,14 +161,16 @@ export const WelcomeView = ({
             <p className="text-muted-foreground mt-2 max-w-xs text-sm leading-relaxed">
               Swasthya Bharat needs microphone access to have a voice conversation with you.
             </p>
-            <div className="bg-muted mt-4 w-full rounded-lg px-4 py-3 text-left text-xs text-muted-foreground">
-              <p className="font-semibold mb-1">How to allow microphone access:</p>
-              <ol className="list-decimal list-inside space-y-1">
+            <div className="bg-muted text-muted-foreground mt-4 w-full rounded-lg px-4 py-3 text-left text-xs">
+              <p className="mb-1 font-semibold">How to allow microphone access:</p>
+              <ol className="list-inside list-decimal space-y-1">
                 <li>Click the lock icon in your browser address bar.</li>
                 <li>
                   Find <strong>Microphone</strong> and set it to <strong>Allow</strong>.
                 </li>
-                <li>Click <strong>Try Again</strong> below.</li>
+                <li>
+                  Click <strong>Try Again</strong> below.
+                </li>
               </ol>
             </div>
             <Button
@@ -165,9 +192,7 @@ export const WelcomeView = ({
             <h1 className="text-foreground text-lg font-semibold tracking-tight">
               Connecting to Swasthya Bharat…
             </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Please wait while we connect you.
-            </p>
+            <p className="text-muted-foreground mt-1 text-sm">Please wait while we connect you.</p>
             <PulsingDots />
             <Button
               id="start-call-button"
@@ -223,15 +248,21 @@ export const WelcomeView = ({
             </Button>
 
             <p className="text-muted-foreground mt-4 text-xs leading-5">
-              આયુષ્માન PM-JAY કાર્ડ, ABHA હેલ્થ ID, સરકારી હોસ્પિટલ અને સ્વાસ્થ્ય સેવાની
-              માહિતી માટે પૂછો
+              આયુષ્માન PM-JAY કાર્ડ, ABHA હેલ્થ ID, સરકારી હોસ્પિટલ અને સ્વાસ્થ્ય સેવાની માહિતી માટે
+              પૂછો
             </p>
           </>
         )}
       </section>
 
-      {/* ── Healthcare Disclaimer (non-intrusive, fixed bottom) ──── */}
-      <div className="fixed bottom-5 left-0 flex w-full items-center justify-center px-4">
+      {/* ── Healthcare Disclaimer & Analytics Link (non-intrusive, fixed bottom) ──── */}
+      <div className="fixed bottom-4 left-0 flex w-full flex-col items-center justify-center gap-1 px-4">
+        <a
+          href="/analytics"
+          className="text-xs font-medium text-sky-400 opacity-90 transition hover:underline hover:opacity-100"
+        >
+          📊 View Call Analytics Dashboard
+        </a>
         <p className="text-muted-foreground max-w-prose text-center text-xs leading-5 font-normal">
           <strong>Disclaimer:</strong> Swasthya Bharat provides general health information and does
           not replace professional medical advice.

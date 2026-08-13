@@ -1,6 +1,8 @@
 import asyncio
 import json
 import logging
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -139,6 +141,11 @@ class Assistant(Agent):
         )
         super().__init__(instructions=instructions)
         self._user_id = user_id
+        self.has_human_escalation = False
+        self.has_emergency = False
+        self.request_completed = False
+        self.success_reason: str | None = None
+        self.failure_reason: str | None = None
 
     @function_tool
     async def lookup_caller(
@@ -280,6 +287,12 @@ class Assistant(Agent):
             radius_km=radius_km,
             limit=limit,
         )
+        if isinstance(result, dict) and result.get("success"):
+            self.request_completed = True
+            self.success_reason = "Healthcare facility lookup completed"
+        elif isinstance(result, dict) and not result.get("success"):
+            self.failure_reason = result.get("message", "Facility lookup failed")
+
         return json.dumps(result, ensure_ascii=False)
 
     @function_tool
@@ -323,6 +336,12 @@ class Assistant(Agent):
             language=language,
             follow_up_method=follow_up_method,
         )
+        self.has_human_escalation = True
+        if urgency == "urgent" or reason == "emergency_red_flags":
+            self.has_emergency = True
+        self.request_completed = True
+        self.success_reason = "Human escalation request created"
+
         ref_id = record["reference_id"]
         return (
             f"Escalation request created successfully. "
@@ -427,23 +446,140 @@ async def my_agent(ctx: JobContext):
     # await avatar.start(session, room=ctx.room)
 
     # Start the session, which initializes the voice pipeline and warms up the models
-    await session.start(
-        agent=Assistant(user_id=user_id),
-        room=ctx.room,
-        room_options=room_io.RoomOptions(
-            audio_input=room_io.AudioInputOptions(
-                noise_cancellation=lambda params: (
-                    noise_cancellation.BVCTelephony()
-                    if params.participant.kind
-                    == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
-                    else noise_cancellation.BVC()
+    assistant = Assistant(user_id=user_id)
+    started_at_dt = datetime.now(timezone.utc)
+    started_at = started_at_dt.isoformat()
+    call_id = f"CALL-{started_at_dt.strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6]}"
+
+    @session.on("conversation_item_added")
+    def _on_item_added(ev):
+        item = getattr(ev, "item", None)
+        role_str = str(getattr(item, "role", "")).lower()
+        if "assistant" in role_str:
+            assistant.request_completed = True
+            if not assistant.success_reason:
+                assistant.success_reason = "General health guidance provided"
+            content = str(getattr(item, "content", "")).lower()
+            if (
+                "medical emergency" in content
+                or "emergency department" in content
+                or "emergency services" in content
+            ):
+                assistant.has_emergency = True
+
+    @session.on("agent_state_changed")
+    def _on_agent_state(ev):
+        new_state_str = str(getattr(ev, "new_state", "")).lower()
+        if "speaking" in new_state_str:
+            assistant.request_completed = True
+            if not assistant.success_reason:
+                assistant.success_reason = "General health guidance provided"
+
+    @session.on("speech_created")
+    def _on_speech_created(ev):
+        assistant.request_completed = True
+        if not assistant.success_reason:
+            assistant.success_reason = "General health guidance provided"
+
+    disconnect_event = asyncio.Event()
+
+    @ctx.room.on("disconnected")
+    def _on_disconnected(*args, **kwargs):
+        if not disconnect_event.is_set():
+            disconnect_event.set()
+
+    try:
+        await session.start(
+            agent=assistant,
+            room=ctx.room,
+            room_options=room_io.RoomOptions(
+                audio_input=room_io.AudioInputOptions(
+                    noise_cancellation=lambda params: (
+                        noise_cancellation.BVCTelephony()
+                        if params.participant.kind
+                        == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
+                        else noise_cancellation.BVC()
+                    ),
                 ),
             ),
-        ),
-    )
+        )
 
-    # Join the room and connect to the user
-    await ctx.connect()
+        # Join the room and connect to the user
+        await ctx.connect()
+        # Wait until the user or agent disconnects from the room
+        await disconnect_event.wait()
+    finally:
+        ended_at_dt = datetime.now(timezone.utc)
+        ended_at = ended_at_dt.isoformat()
+        duration_seconds = max(0, int((ended_at_dt - started_at_dt).total_seconds()))
+
+        req_completed = getattr(assistant, "request_completed", False)
+        succ_reason = getattr(assistant, "success_reason", None)
+        fail_reason = getattr(assistant, "failure_reason", None)
+        has_esc = getattr(assistant, "has_human_escalation", False)
+        has_emerg = getattr(assistant, "has_emergency", False)
+
+        # Inspect session ground-truth history items for guaranteed success detection
+        if (
+            not req_completed
+            and hasattr(session, "history")
+            and hasattr(session.history, "items")
+        ):
+            for item in session.history.items:
+                role_str = str(getattr(item, "role", "")).lower()
+                name_str = str(getattr(item, "name", "")).lower()
+                content_str = str(getattr(item, "content", "")).lower()
+
+                if "assistant" in role_str:
+                    req_completed = True
+                    succ_reason = "General health guidance provided"
+                    if any(
+                        kw in content_str
+                        for kw in [
+                            "medical emergency",
+                            "emergency department",
+                            "emergency services",
+                            "108",
+                        ]
+                    ):
+                        has_emerg = True
+                    break
+                if name_str in (
+                    "find_nearest_healthcare_facility",
+                    "create_escalation",
+                    "save_caller_memory",
+                ):
+                    req_completed = True
+                    succ_reason = f"Request handled via {name_str}"
+                    if name_str == "create_escalation":
+                        has_esc = True
+                    break
+
+        outcome = "successful" if req_completed else "failed"
+        final_failure_reason = (
+            None
+            if req_completed
+            else (
+                fail_reason
+                or "User disconnected or ended conversation before request was completed"
+            )
+        )
+
+        try:
+            memory.record_call(
+                call_id=call_id,
+                user_id=user_id,
+                started_at=started_at,
+                ended_at=ended_at,
+                duration_seconds=duration_seconds,
+                outcome=outcome,
+                success_reason=succ_reason,
+                failure_reason=final_failure_reason,
+                human_escalation=has_esc,
+                emergency_case=has_emerg,
+            )
+        except Exception as exc:
+            logger.exception("Failed to record call analytics: %s", exc)
 
 
 if __name__ == "__main__":

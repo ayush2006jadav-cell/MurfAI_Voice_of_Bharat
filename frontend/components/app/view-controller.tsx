@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useSessionContext } from '@livekit/components-react';
 import type { AppConfig } from '@/app-config';
 import { AgentSessionView_01 } from '@/components/agents-ui/blocks/agent-session-view-01';
-import { WelcomeView, type WelcomeState } from '@/components/app/welcome-view';
+import { type WelcomeState, WelcomeView } from '@/components/app/welcome-view';
 
 const MotionSessionView = motion.create(AgentSessionView_01);
 
@@ -65,11 +65,7 @@ export function ViewController({ appConfig }: ViewControllerProps) {
     <AnimatePresence mode="wait">
       {/* Welcome / Connecting / Ended view */}
       {!isConnected && (
-        <motion.div
-          key="welcome"
-          {...VIEW_MOTION_PROPS}
-          className="contents"
-        >
+        <motion.div key="welcome" {...VIEW_MOTION_PROPS} className="contents">
           <WelcomeView
             startButtonText={appConfig.startButtonText}
             onStartCall={handleStart}

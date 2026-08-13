@@ -16,14 +16,11 @@ All Twilio API calls are mocked. No real phone calls are made.
 Memory and facility_lookup tests are not touched.
 """
 
-import json
-import os
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from aiohttp.test_utils import TestClient, TestServer
 
 # ---------------------------------------------------------------------------
 # Ensure src/ is importable
@@ -36,7 +33,6 @@ import outbound_calling  # noqa: E402
 
 # We import webhook_server after path setup
 import webhook_server  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -74,9 +70,7 @@ def test_make_followup_call_consent_true_creates_call():
     mock_client.calls.create.return_value = mock_call
 
     with (
-        patch(
-            "outbound_calling._get_twilio_client", return_value=mock_client
-        ),
+        patch("outbound_calling._get_twilio_client", return_value=mock_client),
         patch("outbound_calling.memory.lookup_caller", return_value=None),
     ):
         result = outbound_calling.make_followup_call(

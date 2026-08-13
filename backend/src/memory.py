@@ -49,6 +49,20 @@ CREATE TABLE IF NOT EXISTS escalations (
     created_at        TEXT NOT NULL,
     status            TEXT NOT NULL DEFAULT 'open'
 );
+
+CREATE TABLE IF NOT EXISTS calls (
+    call_id          TEXT PRIMARY KEY,
+    user_id          TEXT NOT NULL,
+    started_at       TEXT NOT NULL,
+    ended_at         TEXT NOT NULL,
+    duration_seconds INTEGER NOT NULL DEFAULT 0,
+    outcome          TEXT NOT NULL,
+    success_reason   TEXT,
+    failure_reason   TEXT,
+    human_escalation INTEGER NOT NULL DEFAULT 0,
+    emergency_case   INTEGER NOT NULL DEFAULT 0,
+    created_at       TEXT NOT NULL
+);
 """
 
 
@@ -252,3 +266,194 @@ def update_escalation_status(reference_id: str, status: str) -> dict | None:
             (st, ref_id),
         )
     return get_escalation(ref_id)
+
+
+# ===========================================================================
+# Day 8 — Call Analytics Database Helpers
+# ===========================================================================
+
+
+def format_duration(seconds: int) -> str:
+    """Format duration in seconds to human-readable string (e.g. 134 -> '2m 14s', 45 -> '45s')."""
+    if seconds <= 0:
+        return "0s"
+    minutes = seconds // 60
+    rem_seconds = seconds % 60
+    if minutes == 0:
+        return f"{rem_seconds}s"
+    if rem_seconds == 0:
+        return f"{minutes}m"
+    return f"{minutes}m {rem_seconds}s"
+
+
+def mask_user_id(user_id: str) -> str:
+    """Mask sensitive user identifiers for privacy in public dashboard tables."""
+    uid = user_id.strip()
+    if not uid:
+        return "Anonymous"
+    if uid.startswith("+") or uid.isdigit():
+        # Mask phone number e.g. +919876543210 -> +91****3210
+        if len(uid) > 6:
+            return uid[:3] + "****" + uid[-4:]
+        return "****"
+    if len(uid) > 12:
+        return uid[:4] + "..." + uid[-4:]
+    return uid
+
+
+def record_call(
+    call_id: str,
+    user_id: str,
+    started_at: str,
+    ended_at: str,
+    duration_seconds: int,
+    outcome: str,
+    success_reason: str | None = None,
+    failure_reason: str | None = None,
+    human_escalation: bool = False,
+    emergency_case: bool = False,
+) -> dict:
+    """Record a completed call record into the SQLite database.
+
+    outcome MUST be either 'successful' or 'failed'.
+    """
+    valid_outcomes = {"successful", "failed"}
+    normalized_outcome = outcome.strip().lower()
+    if normalized_outcome not in valid_outcomes:
+        raise ValueError(
+            f"Invalid call outcome {outcome!r}. Must be one of {valid_outcomes}"
+        )
+
+    now = datetime.now(timezone.utc).isoformat()
+    clean_uid = user_id.strip().lower()
+    dur = max(0, int(duration_seconds))
+
+    with _get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO calls (
+                call_id, user_id, started_at, ended_at, duration_seconds,
+                outcome, success_reason, failure_reason, human_escalation,
+                emergency_case, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(call_id) DO UPDATE SET
+                ended_at         = excluded.ended_at,
+                duration_seconds = excluded.duration_seconds,
+                outcome          = excluded.outcome,
+                success_reason   = excluded.success_reason,
+                failure_reason   = excluded.failure_reason,
+                human_escalation = excluded.human_escalation,
+                emergency_case   = excluded.emergency_case
+            """,
+            (
+                call_id.strip(),
+                clean_uid,
+                started_at,
+                ended_at,
+                dur,
+                normalized_outcome,
+                success_reason,
+                failure_reason,
+                1 if human_escalation else 0,
+                1 if emergency_case else 0,
+                now,
+            ),
+        )
+
+    logger.info(
+        "Recorded call call_id=%r outcome=%r duration=%ds",
+        call_id,
+        normalized_outcome,
+        dur,
+    )
+
+    with _get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM calls WHERE call_id = ?", (call_id.strip(),)
+        ).fetchone()
+        return dict(row)
+
+
+def list_calls(limit: int = 50) -> list[dict]:
+    """Return recent calls ordered newest first."""
+    with _get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM calls ORDER BY created_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_analytics_summary() -> dict:
+    """Calculate and return real call analytics summary metrics from database.
+
+    Never returns hardcoded demo values. Safely handles 0 calls without division by zero.
+    """
+    with _get_conn() as conn:
+        total_calls = conn.execute("SELECT COUNT(*) FROM calls").fetchone()[0]
+        successful_calls = conn.execute(
+            "SELECT COUNT(*) FROM calls WHERE outcome = 'successful'"
+        ).fetchone()[0]
+        failed_calls = conn.execute(
+            "SELECT COUNT(*) FROM calls WHERE outcome = 'failed'"
+        ).fetchone()[0]
+
+        # Calculate success rate safely
+        if total_calls > 0:
+            raw_rate = (successful_calls / total_calls) * 100.0
+            success_rate = round(raw_rate, 1)
+            if success_rate.is_integer():
+                success_rate = int(success_rate)
+        else:
+            success_rate = 0
+
+        # Calculate average duration safely
+        avg_dur_row = conn.execute(
+            "SELECT AVG(duration_seconds) FROM calls"
+        ).fetchone()[0]
+        avg_duration_seconds = round(avg_dur_row) if avg_dur_row is not None else 0
+
+        human_escalations = conn.execute(
+            "SELECT COUNT(*) FROM calls WHERE human_escalation = 1"
+        ).fetchone()[0]
+        emergency_cases = conn.execute(
+            "SELECT COUNT(*) FROM calls WHERE emergency_case = 1"
+        ).fetchone()[0]
+
+        # Fetch recent calls with safe metadata only
+        recent_rows = conn.execute(
+            """
+            SELECT call_id, user_id, started_at, duration_seconds, outcome, human_escalation, emergency_case
+            FROM calls
+            ORDER BY created_at DESC
+            LIMIT 20
+            """
+        ).fetchall()
+
+    recent_calls = []
+    for r in recent_rows:
+        row_dict = dict(r)
+        recent_calls.append(
+            {
+                "call_id": row_dict["call_id"],
+                "user_id_masked": mask_user_id(row_dict["user_id"]),
+                "started_at": row_dict["started_at"],
+                "duration_seconds": row_dict["duration_seconds"],
+                "duration_formatted": format_duration(row_dict["duration_seconds"]),
+                "outcome": row_dict["outcome"],
+                "human_escalation": bool(row_dict["human_escalation"]),
+                "emergency_case": bool(row_dict["emergency_case"]),
+            }
+        )
+
+    return {
+        "total_calls": total_calls,
+        "successful_calls": successful_calls,
+        "failed_calls": failed_calls,
+        "success_rate": success_rate,
+        "average_duration_seconds": avg_duration_seconds,
+        "average_duration_formatted": format_duration(avg_duration_seconds),
+        "human_escalations": human_escalations,
+        "emergency_cases": emergency_cases,
+        "recent_calls": recent_calls,
+    }

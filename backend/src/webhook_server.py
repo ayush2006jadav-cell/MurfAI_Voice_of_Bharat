@@ -642,6 +642,134 @@ async def handle_dashboard(request: web.Request) -> web.Response:
     return web.Response(text=html, content_type="text/html")
 
 
+async def handle_get_analytics(request: web.Request) -> web.Response:
+    """GET /api/analytics — Return JSON metrics for Call Analytics Dashboard."""
+    summary = memory.get_analytics_summary()
+    return web.json_response(summary)
+
+
+async def handle_call_analytics_dashboard(request: web.Request) -> web.Response:
+    """GET /analytics — HTML Call Analytics Dashboard for Swasthya Bharat."""
+    summary = memory.get_analytics_summary()
+
+    recent_rows_html = ""
+    for c in summary["recent_calls"]:
+        outcome_bg = "#16a34a" if c["outcome"] == "successful" else "#dc2626"
+        esc_badge = (
+            '<span style="background:#eab308; color:#000; padding:2px 6px; border-radius:10px; font-weight:bold;">Yes</span>'
+            if c["human_escalation"]
+            else '<span style="color:#9ca3af;">No</span>'
+        )
+        emerg_badge = (
+            '<span style="background:#dc2626; color:#fff; padding:2px 6px; border-radius:10px; font-weight:bold;">Yes</span>'
+            if c["emergency_case"]
+            else '<span style="color:#9ca3af;">No</span>'
+        )
+
+        recent_rows_html += f"""
+        <tr>
+            <td style="font-family:monospace; color:#38bdf8; font-weight:bold;">{c["call_id"]}</td>
+            <td style="font-size:13px; color:#cbd5e1;">{c["started_at"][:19]}</td>
+            <td style="font-size:13px;">{c["duration_formatted"]}</td>
+            <td><span style="background:{outcome_bg}; color:#fff; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;">{c["outcome"].upper()}</span></td>
+            <td>{esc_badge}</td>
+            <td>{emerg_badge}</td>
+        </tr>
+        """
+
+    if not recent_rows_html:
+        recent_rows_html = '<tr><td colspan="6" style="text-align:center; padding:30px; color:#9ca3af;">No calls recorded yet.</td></tr>'
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swasthya Bharat — Call Analytics</title>
+    <style>
+        body {{ font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 24px; }}
+        .header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid #334155; padding-bottom: 16px; }}
+        h1 {{ font-size: 24px; margin: 0; color: #38bdf8; display: flex; align-items: center; gap: 10px; }}
+        .badge-live {{ background: #0284c7; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }}
+        .section-title {{ font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; margin-top: 24px; margin-bottom: 12px; font-weight: 700; }}
+        .grid-3 {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px; }}
+        .card {{ background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); }}
+        .card-title {{ font-size: 13px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 8px; }}
+        .card-value {{ font-size: 32px; font-weight: 800; color: #f8fafc; }}
+        .val-success {{ color: #4ade80; }}
+        .val-failed {{ color: #f87171; }}
+        .val-blue {{ color: #38bdf8; }}
+        .val-amber {{ color: #fbbf24; }}
+        table {{ width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); margin-top: 12px; }}
+        th, td {{ padding: 14px 18px; text-align: left; border-bottom: 1px solid #334155; }}
+        th {{ background: #0f172a; color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }}
+        tr:hover {{ background: #283548; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Swasthya Bharat — Call Analytics</h1>
+        <span class="badge-live">Live SQLite Data</span>
+    </div>
+
+    <div class="section-title">Top Metrics</div>
+    <div class="grid-3">
+        <div class="card">
+            <div class="card-title">Total Calls</div>
+            <div class="card-value">{summary["total_calls"]}</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Successful Calls</div>
+            <div class="card-value val-success">{summary["successful_calls"]}</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Failed Calls</div>
+            <div class="card-value val-failed">{summary["failed_calls"]}</div>
+        </div>
+    </div>
+
+    <div class="section-title">Secondary Metrics</div>
+    <div class="grid-3">
+        <div class="card">
+            <div class="card-title">Success Rate</div>
+            <div class="card-value val-blue">{summary["success_rate"]}%</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Human Escalations</div>
+            <div class="card-value val-amber">{summary["human_escalations"]}</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Emergency Cases</div>
+            <div class="card-value val-failed">{summary["emergency_cases"]}</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 24px;">
+        <div class="card-title">Average Call Duration</div>
+        <div class="card-value val-blue">{summary["average_duration_formatted"]}</div>
+    </div>
+
+    <div class="section-title">Recent Calls</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Call ID</th>
+                <th>Date / Time</th>
+                <th>Duration</th>
+                <th>Outcome</th>
+                <th>Human Escalation</th>
+                <th>Emergency Case</th>
+            </tr>
+        </thead>
+        <tbody>
+            {recent_rows_html}
+        </tbody>
+    </table>
+</body>
+</html>"""
+    return web.Response(text=html, content_type="text/html")
+
+
 # ---------------------------------------------------------------------------
 # Server setup
 # ---------------------------------------------------------------------------
@@ -656,6 +784,8 @@ def create_app() -> web.Application:
     app.router.add_get("/dashboard", handle_dashboard)
     app.router.add_get("/api/escalations", handle_get_escalations)
     app.router.add_post("/api/escalations/status", handle_update_escalation_status)
+    app.router.add_get("/api/analytics", handle_get_analytics)
+    app.router.add_get("/analytics", handle_call_analytics_dashboard)
     return app
 
 
@@ -668,6 +798,8 @@ def main() -> None:
     logger.info("Endpoints:")
     logger.info("  POST /api/follow-up-call  — trigger outbound call")
     logger.info("  POST /api/twilio/voice    — Twilio TwiML webhook")
+    logger.info("  GET  /api/analytics        — Call Analytics API")
+    logger.info("  GET  /analytics            — Call Analytics Dashboard")
 
     base_url = os.environ.get("PUBLIC_BASE_URL", "(not set)")
     logger.info("PUBLIC_BASE_URL=%s", base_url)

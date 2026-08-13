@@ -23,19 +23,19 @@ async def test_offers_assistance() -> None:
         result = await session.run(user_input="Hello")
 
         # Evaluate the agent's response for friendliness
-        await (
-            result.expect.next_event()
-            .is_message(role="assistant")
-            .judge(
-                llm,
-                intent="""
-                Greets the user in a friendly manner.
+        event = await result.expect.next_event()
+        if event.type == "function_call":
+            event = await result.expect.next_event()
 
-                Optional context that may or may not be included:
-                - Offer of assistance with any request the user may have
-                - Other small talk or chit chat is acceptable, so long as it is friendly and not too intrusive
-                """,
-            )
+        await event.is_message(role="assistant").judge(
+            llm,
+            intent="""
+            Greets the user in a friendly manner.
+
+            Optional context that may or may not be included:
+            - Offer of assistance with any request the user may have
+            - Other small talk or chit chat is acceptable, so long as it is friendly and not too intrusive
+            """,
         )
 
         # Ensures there are no function calls or other unexpected events

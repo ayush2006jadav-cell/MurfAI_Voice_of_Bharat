@@ -53,7 +53,8 @@ Edit [`app-config.ts`](app-config.ts) to change branding, features, and button t
 export const APP_CONFIG_DEFAULTS: AppConfig = {
   companyName: 'Swasthya Bharat (સ્વાસ્થ્ય ભારત)',
   pageTitle: 'Swasthya Bharat — Health Access Voice AI (Gujarati & English)',
-  pageDescription: 'Your friendly health access voice assistant fluent in Gujarati (ગુજરાતી) and English, assisting with government health schemes and local health centers.',
+  pageDescription:
+    'Your friendly health access voice assistant fluent in Gujarati (ગુજરાતી) and English, assisting with government health schemes and local health centers.',
 
   supportsChatInput: true,
   supportsVideoInput: true,
