@@ -23,9 +23,9 @@ async def test_offers_assistance() -> None:
         result = await session.run(user_input="Hello")
 
         # Evaluate the agent's response for friendliness
-        event = await result.expect.next_event()
-        if event.type == "function_call":
-            event = await result.expect.next_event()
+        event = result.expect.next_event()
+        if getattr(event, "type", None) == "function_call":
+            event = result.expect.next_event()
 
         await event.is_message(role="assistant").judge(
             llm,

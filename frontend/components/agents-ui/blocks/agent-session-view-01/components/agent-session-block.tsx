@@ -19,44 +19,107 @@ import { TileLayout } from './tile-view';
 
 const MotionMessage = motion.create(Shimmer);
 
-// ─── Speaking/Listening state banner ─────────────────────────────────────────
-function AgentStateBanner() {
+function AgentStateBanner({
+  messages = [],
+}: {
+  messages?: Array<{ message?: string; content?: string; [key: string]: unknown }>;
+}) {
   const { state: agentState } = useVoiceAssistant();
 
-  // Map LiveKit agent states to user-facing labels
+  // Detect active agent based on the latest handoff transition in transcript
+  let isSpecialistActive = false;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const text = (messages[i]?.message || messages[i]?.content || '').toLowerCase();
+    if (
+      text.includes('handing you back to the main') ||
+      text.includes('handed back to the main') ||
+      text.includes('main swasthya bharat assistant') ||
+      text.includes('main assistant')
+    ) {
+      isSpecialistActive = false;
+      break;
+    }
+    if (
+      text.includes('clinic & appointment specialist') ||
+      text.includes('clinic and appointment specialist') ||
+      text.includes('specialist to help you find') ||
+      text.includes('clinic & appointment')
+    ) {
+      isSpecialistActive = true;
+      break;
+    }
+  }
+
   const isSpeaking = agentState === 'speaking';
   const isListening = agentState === 'listening';
   const isThinking = agentState === 'thinking';
 
-  // Only show when there is something meaningful to show
-  if (!isSpeaking && !isListening && !isThinking) return null;
-
   return (
-    <AnimatePresence mode="wait">
+    <div className="pointer-events-none absolute inset-x-0 top-4 z-50 flex flex-col items-center gap-2">
+      {/* Active Agent Badge Indicator */}
       <motion.div
-        key={agentState}
-        initial={{ opacity: 0, y: -6 }}
+        initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="absolute top-16 left-1/2 z-50 -translate-x-1/2"
-        aria-live="polite"
-        aria-atomic="true"
+        transition={{ duration: 0.3 }}
+        className="pointer-events-auto"
       >
         <span
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tracking-wide',
-            isSpeaking
-              ? 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300'
-              : 'bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300'
+            'inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold tracking-wide shadow-md backdrop-blur-md transition-all duration-300',
+            isSpecialistActive
+              ? 'border border-emerald-400/40 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-900/30'
+              : 'border border-sky-400/40 bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-blue-900/30'
           )}
         >
-          {isSpeaking && <>🔊 Swasthya Bharat is speaking…</>}
-          {isListening && <>🎙️ Listening to you…</>}
-          {isThinking && <>🤔 Thinking…</>}
+          {isSpecialistActive ? (
+            <>
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75"></span>
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-200"></span>
+              </span>
+              👨‍⚕️ Active Agent: Clinic & Appointment Specialist
+            </>
+          ) : (
+            <>
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-300 opacity-75"></span>
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-sky-200"></span>
+              </span>
+              🏥 Active Agent: Swasthya Bharat Main Assistant
+            </>
+          )}
         </span>
       </motion.div>
-    </AnimatePresence>
+
+      {/* Spoken / Listening / Thinking State Pill */}
+      {(isSpeaking || isListening || isThinking) && (
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={agentState}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.2 }}
+            className="pointer-events-auto"
+          >
+            <span
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold tracking-wide shadow-sm backdrop-blur-md',
+                isSpeaking
+                  ? 'border border-blue-400/30 bg-blue-500/20 text-blue-300'
+                  : isListening
+                    ? 'border border-emerald-400/30 bg-emerald-500/20 text-emerald-300'
+                    : 'border border-amber-400/30 bg-amber-500/20 text-amber-300'
+              )}
+            >
+              {isSpeaking && <>🔊 Speaking…</>}
+              {isListening && <>🎙️ Listening to you…</>}
+              {isThinking && <>🤔 Thinking…</>}
+            </span>
+          </motion.div>
+        </AnimatePresence>
+      )}
+    </div>
   );
 }
 
@@ -251,8 +314,8 @@ export function AgentSessionView_01({
       {...props}
     >
       <Fade top className="absolute inset-x-4 top-0 z-10 h-40" />
-      {/* Agent state banner: shows LISTENING or SPEAKING */}
-      <AgentStateBanner />
+      {/* Agent state banner: shows ACTIVE AGENT BADGE & LISTENING/SPEAKING pill */}
+      <AgentStateBanner messages={messages} />
       {/* transcript */}
 
       <div className="absolute top-0 bottom-[135px] flex w-full flex-col md:bottom-[170px]">

@@ -121,13 +121,241 @@ Mandatory Consent & Privacy Constraints:
 - NEVER call create_escalation for general health questions, facility lookups, or normal conversations.
 - NEVER store passwords, OTPs, PINs, bank details, API keys, full conversation transcripts, or detailed medical notes in the summary.
 
-Post-Escalation Response:
-- After create_escalation returns a reference ID (e.g. ESC-2026-001), state clearly:
-  1. The human support request has been created.
-  2. Provide their reference ID (e.g., ESC-2026-001).
-  3. Explain that a human support team can review the information they approved.
-  4. Do NOT promise an immediate response.
-  5. For urgent situations, remind them that emergency care takes priority over waiting for human support."""
+SPECIALIST HANDOFF RULES (DAY 9):
+Call the handoff_to_clinic_appointment_specialist tool ONLY when the user's request specifically requires healthcare facility discovery (finding clinics, hospitals, doctors' offices, or Primary Health Centers) or general appointment-related guidance.
+
+DO NOT call handoff_to_clinic_appointment_specialist for:
+- General health questions or wellness information.
+- Symptom questions that can be safely answered with educational guidance.
+- Diagnosis requests (refuse and offer human escalation per Rule 2 above).
+- Medication questions, drug names, or dosages.
+- Emergency situations (follow Emergency Constraint 2 immediately).
+- Caller memory lookup/save or normal chat.
+
+When calling handoff_to_clinic_appointment_specialist, pass the user's original request, any city or area already provided (e.g. 'Surat', 'Ahmedabad'), and the requested facility type.
+Before transferring, inform the caller clearly: "I'll connect you to our clinic and appointment specialist to help you find a suitable healthcare facility."
+"""
+
+
+SPECIALIST_SYSTEM_PROMPT = """You are the Clinic & Appointment Specialist for Swasthya Bharat (સ્વાસ્થ્ય ભારત). Your job is to help users find suitable healthcare facilities (hospitals, clinics, doctors' offices, and Primary Health Centers) and provide general appointment-related guidance. Use real facility data whenever available using the find_nearest_healthcare_facility tool. Never invent facility details, opening hours, phone numbers, consultation fees, or appointment availability. You do not diagnose medical conditions, prescribe medications, recommend drug names or dosages, or replace professional medical advice. If appointment availability cannot be verified, clearly tell the user and advise them to contact the healthcare facility directly.
+
+Key Responsibilities & Behaviors:
+1. Specialist Introduction:
+   - When introducing yourself after taking over a conversation, be brief and natural: "Hello, I'm the Clinic & Appointment Specialist. I can help you find nearby healthcare facilities and provide general appointment guidance."
+   - Acknowledge any relevant context already provided (such as city/area, facility type, or original user request) so the user does not have to repeat themselves.
+
+2. Real Healthcare Facility Discovery:
+   - Use find_nearest_healthcare_facility to search for real facilities via OpenStreetMap.
+   - If a location (such as "Surat" or "Ahmedabad") is provided in context or by the user, search using that location directly. Do NOT ask for the location again if it was already provided.
+   - If location is missing or unknown, ask: "Which city or area should I search around?"
+   - Report factual information returned by the facility lookup tool.
+   - If facility lookup fails or returns no results, respond clearly: "I'm unable to retrieve nearby healthcare facilities right now. Please try again later or contact a known healthcare facility directly." Never invent or hallucinate facilities.
+
+3. General Appointment Guidance & Mandatory Limitations:
+   - Guide users on how to arrange appointments directly with facilities (e.g., recommend calling the clinic, preparing their name, preferred time slot, general reason for visit, and contact details).
+   - CLEARLY explain that you cannot book appointments directly because there is no live appointment booking system integrated.
+   - NEVER claim an appointment has been booked or that a doctor has accepted an appointment.
+   - NEVER invent appointment slots, doctor availability, clinic timings, consultation fees, contact numbers, or specific healthcare services.
+   - Never ask for or collect sensitive personal data such as OTPs, passwords, PINs, bank details, or account numbers.
+
+4. Healthcare & Emergency Safety Constraints (MANDATORY):
+   - Never diagnose any medical condition.
+   - Never prescribe medications or recommend drug names or dosages.
+   - If the user reports potentially life-threatening emergency symptoms (chest pain, difficulty breathing, severe bleeding, etc.), immediately advise them to contact local emergency services (108) or go to the nearest emergency department.
+
+5. Bilingual & Voice-Optimized Delivery:
+   - Respond fluently in Gujarati if the user speaks Gujarati, English if English, or bilingual Gujlish if mixed.
+   - Keep replies concise (1 to 3 spoken sentences per turn).
+   - Do NOT use markdown formatting (no asterisks, bolding, bullet points), emojis, or special symbols.
+
+6. Returning to the Main Agent:
+   - After you have completed the user's clinic or appointment request (facility information given, or user says they have what they need, or user asks a general health question), you MUST call the return_to_main_agent tool to hand the conversation back to the main Swasthya Bharat agent.
+   - Before calling return_to_main_agent, say something like: "I'll hand you back to the main Swasthya Bharat assistant now. Is there anything else I can help with?"
+   - Never answer general health, medication, or symptom questions — politely redirect those to the main agent by calling return_to_main_agent.
+"""
+
+
+class ClinicAppointmentSpecialist(Agent):
+    def __init__(
+        self,
+        user_id: str = "anonymous",
+        context_info: str | None = None,
+        main_agent: Agent | None = None,
+    ) -> None:
+        instructions = (
+            SPECIALIST_SYSTEM_PROMPT
+            + f"\n\nThe caller's user_id for this conversation is: {user_id!r}. "
+            "Use this exact value when calling lookup_caller or save_caller_memory."
+        )
+        if context_info:
+            instructions += f"\n\nContext passed from main agent: {context_info}"
+        super().__init__(instructions=instructions)
+        self._user_id = user_id
+        self._main_agent = main_agent
+        self.request_completed = False
+        self.success_reason: str | None = None
+        self.failure_reason: str | None = None
+        self.has_human_escalation = False
+        self.has_emergency = False
+
+    async def _delayed_intro(self) -> None:
+        await asyncio.sleep(0.5)
+        if self.session:
+            try:
+                logger.info("ClinicAppointmentSpecialist speaking introductory message")
+                await self.session.say(
+                    "Hello, I'm the Clinic and Appointment Specialist for Swasthya Bharat."
+                    " I can help you find nearby healthcare facilities and provide general appointment guidance."
+                    " Which city or area would you like me to check?",
+                    add_to_chat_ctx=True,
+                )
+            except Exception as exc:
+                logger.exception("Failed during specialist intro: %s", exc)
+
+    async def on_enter(self) -> None:
+        """Triggered automatically when the session updates the active agent to this specialist."""
+        logger.info("ClinicAppointmentSpecialist on_enter triggered")
+        self._intro_task = asyncio.create_task(self._delayed_intro())
+
+    @function_tool
+    async def lookup_caller(
+        self,
+        context: RunContext,
+        user_id: str,
+    ) -> str:
+        """Look up an existing caller's saved memory by user_id."""
+        logger.info("Specialist lookup_caller called for user_id=%r", user_id)
+        record = memory.lookup_caller(user_id)
+        if record is None:
+            return (
+                "No existing record found for this caller. Treat them as a new caller."
+            )
+        return (
+            f"Caller found. Name: {record['name']!r}, "
+            f"Language preference: {record['language_preference']!r}, "
+            f"Facts: {json.dumps(record['facts'], ensure_ascii=False)}, "
+            f"Last interaction: {record['last_interaction']!r}."
+        )
+
+    @function_tool
+    async def save_caller_memory(
+        self,
+        context: RunContext,
+        user_id: str,
+        name: str | None,
+        language_preference: str | None,
+        facts: str | None,
+    ) -> str:
+        """Save or update caller memory after explicit YES consent."""
+        logger.info("Specialist save_caller_memory called for user_id=%r", user_id)
+        parsed_facts: dict | None = None
+        if facts:
+            try:
+                parsed_facts = json.loads(facts)
+            except json.JSONDecodeError:
+                parsed_facts = None
+        memory.save_caller_memory(
+            user_id=user_id,
+            name=name,
+            language_preference=language_preference,
+            facts=parsed_facts,
+        )
+        return f"Memory saved successfully for caller {user_id!r}."
+
+    @function_tool
+    async def find_nearest_healthcare_facility(
+        self,
+        context: RunContext,
+        latitude: float = 0.0,
+        longitude: float = 0.0,
+        facility_type: str = "any",
+        radius_km: float = 10.0,
+        limit: int = 3,
+        location_name: str | None = None,
+    ) -> str:
+        """Find real healthcare facilities near the user's location using OpenStreetMap data. Use this tool when the user asks for a nearby hospital, clinic, doctor, health centre, PHC, or healthcare facility. Never invent facility names or locations.
+
+        Args:
+            latitude: The user's latitude (e.g. 23.0225). Pass 0.0 if unknown.
+            longitude: The user's longitude (e.g. 72.5714). Pass 0.0 if unknown.
+            facility_type: Specific facility type ("hospital", "clinic", "doctor", "health_post", or "any").
+            radius_km: Search radius in kilometers (default 10.0).
+            limit: Maximum number of facilities to return (default 3).
+            location_name: City, locality, or place name if lat/lon are not directly available (e.g. "Ahmedabad", "Surat").
+        """
+        logger.info(
+            "Specialist find_nearest_healthcare_facility: lat=%r lon=%r type=%r radius=%r loc=%r",
+            latitude,
+            longitude,
+            facility_type,
+            radius_km,
+            location_name,
+        )
+
+        if latitude == 0.0 and longitude == 0.0:
+            if location_name and location_name.strip():
+                coords = await asyncio.to_thread(
+                    facility_lookup.geocode_location, location_name
+                )
+                if coords is None:
+                    return json.dumps(
+                        {
+                            "success": False,
+                            "error": "location_not_found",
+                            "message": f"I couldn't find geographic coordinates for '{location_name}'. Please ask the user to clarify their city or area.",
+                        },
+                        ensure_ascii=False,
+                    )
+                latitude, longitude = coords
+            else:
+                return json.dumps(
+                    {
+                        "success": False,
+                        "error": "missing_location",
+                        "message": "I can find nearby healthcare facilities, but I need your current city or location first.",
+                    },
+                    ensure_ascii=False,
+                )
+
+        result = await asyncio.to_thread(
+            facility_lookup.query_overpass_facilities,
+            latitude=latitude,
+            longitude=longitude,
+            facility_type=facility_type,
+            radius_km=radius_km,
+            limit=limit,
+        )
+        if isinstance(result, dict) and result.get("success"):
+            self.request_completed = True
+            self.success_reason = "Healthcare facility lookup completed"
+        elif isinstance(result, dict) and not result.get("success"):
+            self.failure_reason = result.get("message", "Facility lookup failed")
+
+        return json.dumps(result, ensure_ascii=False)
+
+    @function_tool
+    async def return_to_main_agent(
+        self,
+        context: RunContext,
+        summary: str = "",
+    ) -> str:
+        """Hand the conversation back to the main Swasthya Bharat assistant after completing the clinic or appointment task, or when the user asks a general health question outside this specialist's scope.
+
+        Call this tool after you have given the user the facility information they requested, or when the user explicitly says they are done, or when they ask something outside your scope.
+
+        Args:
+            summary: A brief one-sentence summary of what was accomplished (e.g. 'Found 3 hospitals near Surat and advised user to call directly for appointment.').
+        """
+        logger.info(
+            "ClinicAppointmentSpecialist return_to_main_agent called: summary=%r", summary
+        )
+        self.request_completed = True
+        if not self.success_reason:
+            self.success_reason = summary or "Clinic/appointment task completed"
+
+        target_agent = self._main_agent or Assistant(user_id=self._user_id)
+        context.session.update_agent(target_agent)
+        return "Handing you back to the main Swasthya Bharat assistant now. Is there anything else about your health I can help with?"
 
 
 class Assistant(Agent):
@@ -143,6 +371,7 @@ class Assistant(Agent):
         self._user_id = user_id
         self.has_human_escalation = False
         self.has_emergency = False
+        self.has_specialist_handoff = False
         self.request_completed = False
         self.success_reason: str | None = None
         self.failure_reason: str | None = None
@@ -349,6 +578,54 @@ class Assistant(Agent):
             "Please inform the caller of their Reference ID."
         )
 
+    @function_tool
+    async def handoff_to_clinic_appointment_specialist(
+        self,
+        context: RunContext,
+        user_request: str = "",
+        location_name: str | None = None,
+        facility_type: str = "any",
+    ) -> str:
+        """Hand off the conversation to the Clinic & Appointment Specialist when the user wants help finding a clinic, hospital, doctor, healthcare facility, or Primary Health Center, or when the user asks for general appointment-related guidance. Use this tool when the request is specifically about healthcare facility discovery or arranging/contacting a facility for an appointment. Do not use this tool for general health questions, diagnosis requests, medication requests, emergencies, or human-help escalation.
+
+        Args:
+            user_request: The user's original request or reason for seeking clinic/appointment assistance.
+            location_name: The city, locality, or area provided by the user (e.g. "Surat", "Ahmedabad"), or None if not specified.
+            facility_type: The type of facility requested ("clinic", "hospital", "doctor", "health_post", or "any").
+        """
+        logger.info(
+            "handoff_to_clinic_appointment_specialist called: request=%r loc=%r type=%r",
+            user_request,
+            location_name,
+            facility_type,
+        )
+
+        context_parts = []
+        if user_request and user_request.strip():
+            context_parts.append(f"Original user request: {user_request.strip()}")
+        if location_name and location_name.strip():
+            context_parts.append(f"Location provided: {location_name.strip()}")
+        if facility_type and facility_type != "any":
+            context_parts.append(f"Facility type requested: {facility_type}")
+
+        context_info = "; ".join(context_parts) if context_parts else None
+
+        try:
+            specialist = ClinicAppointmentSpecialist(
+                user_id=self._user_id,
+                context_info=context_info,
+                main_agent=self,
+            )
+            context.session.update_agent(specialist)
+            self.request_completed = True
+            self.success_reason = "Handed off to Clinic & Appointment Specialist"
+            self.has_specialist_handoff = True
+            return "I'll connect you to our clinic and appointment specialist to help you find a suitable healthcare facility."
+        except Exception as exc:
+            logger.exception("Failed to switch agent to specialist: %s", exc)
+            self.failure_reason = f"Agent handoff failed: {exc}"
+            return "I'm unable to connect you to the clinic and appointment specialist right now. I can still help with general health information."
+
     # To add more tools, use the @function_tool decorator.
     # Here's an example that adds a simple weather tool.
     # You also have to add `from livekit.agents import function_tool, RunContext` to the top of this file
@@ -380,7 +657,6 @@ server.setup_fnc = prewarm
 @server.rtc_session(agent_name="my-agent")
 async def my_agent(ctx: JobContext):
     # Logging setup
-    # Add any other context you want in all log entries here
     ctx.log_context_fields = {
         "room": ctx.room.name,
     }
@@ -390,9 +666,7 @@ async def my_agent(ctx: JobContext):
 
     # Derive a stable user_id from the first human participant's identity.
     # The frontend sets participantIdentity = 'voice_assistant_user_<RAND>' which
-    # is unique per session. We use it as a session-scoped fallback; the agent
-    # will ask the caller to identify themselves for cross-session persistence
-    # (per Option A agreed with the user).
+    # is unique per session.
     user_id = "anonymous"
     for identity, _participant in ctx.room.remote_participants.items():
         # Pick the first non-agent participant
@@ -403,49 +677,21 @@ async def my_agent(ctx: JobContext):
 
     # Set up a voice AI pipeline using Murf Falcon, Gemini, Deepgram, and the LiveKit turn detector
     session = AgentSession(
-        # Speech-to-text (STT) is your agent's ears, turning the user's speech into text that the LLM can understand
-        # Deepgram Nova-3 with multilingual support detects and transcribes Gujarati and English
         stt=deepgram.STT(model="nova-3", language="multi"),
-        # A Large Language Model (LLM) is your agent's brain, processing user input and generating a response
         llm=google.LLM(
             model="gemini-3.5-flash-lite",
         ),
-        # Text-to-speech (TTS) is your agent's voice, turning the LLM's text into speech that the user can hear
-        # See all available models as well as voice selections at https://docs.livekit.io/agents/models/tts/
         tts=murf.TTS(
             voice="Anisha",
             style="Conversation",
             tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
             text_pacing=True,
         ),
-        # VAD and turn detection are used to determine when the user is speaking and when the agent should respond
-        # See more at https://docs.livekit.io/agents/build/turns
         turn_detection=MultilingualModel(),
         vad=ctx.proc.userdata["vad"],
-        # allow the LLM to generate a response while waiting for the end of turn
-        # See more at https://docs.livekit.io/agents/build/audio/#preemptive-generation
         preemptive_generation=True,
     )
 
-    # To use a realtime model instead of a voice pipeline, use the following session setup instead.
-    # (Note: This is for the OpenAI Realtime API. For other providers, see https://docs.livekit.io/agents/models/realtime/))
-    # 1. Install livekit-agents[openai]
-    # 2. Set OPENAI_API_KEY in .env.local
-    # 3. Add `from livekit.plugins import openai` to the top of this file
-    # 4. Use the following session setup instead of the version above
-    # session = AgentSession(
-    #     llm=openai.realtime.RealtimeModel(voice="marin")
-    # )
-
-    # # Add a virtual avatar to the session, if desired
-    # # For other providers, see https://docs.livekit.io/agents/models/avatar/
-    # avatar = hedra.AvatarSession(
-    #   avatar_id="...",  # See https://docs.livekit.io/agents/models/avatar/plugins/hedra
-    # )
-    # # Start the avatar and wait for it to join
-    # await avatar.start(session, room=ctx.room)
-
-    # Start the session, which initializes the voice pipeline and warms up the models
     assistant = Assistant(user_id=user_id)
     started_at_dt = datetime.now(timezone.utc)
     started_at = started_at_dt.isoformat()
@@ -456,30 +702,33 @@ async def my_agent(ctx: JobContext):
         item = getattr(ev, "item", None)
         role_str = str(getattr(item, "role", "")).lower()
         if "assistant" in role_str:
-            assistant.request_completed = True
-            if not assistant.success_reason:
-                assistant.success_reason = "General health guidance provided"
+            curr_ag = getattr(session, "current_agent", assistant)
+            curr_ag.request_completed = True
+            if not getattr(curr_ag, "success_reason", None):
+                curr_ag.success_reason = "General health guidance provided"
             content = str(getattr(item, "content", "")).lower()
             if (
                 "medical emergency" in content
                 or "emergency department" in content
                 or "emergency services" in content
             ):
-                assistant.has_emergency = True
+                curr_ag.has_emergency = True
 
     @session.on("agent_state_changed")
     def _on_agent_state(ev):
         new_state_str = str(getattr(ev, "new_state", "")).lower()
         if "speaking" in new_state_str:
-            assistant.request_completed = True
-            if not assistant.success_reason:
-                assistant.success_reason = "General health guidance provided"
+            curr_ag = getattr(session, "current_agent", assistant)
+            curr_ag.request_completed = True
+            if not getattr(curr_ag, "success_reason", None):
+                curr_ag.success_reason = "General health guidance provided"
 
     @session.on("speech_created")
     def _on_speech_created(ev):
-        assistant.request_completed = True
-        if not assistant.success_reason:
-            assistant.success_reason = "General health guidance provided"
+        curr_ag = getattr(session, "current_agent", assistant)
+        curr_ag.request_completed = True
+        if not getattr(curr_ag, "success_reason", None):
+            curr_ag.success_reason = "General health guidance provided"
 
     disconnect_event = asyncio.Event()
 
@@ -504,8 +753,9 @@ async def my_agent(ctx: JobContext):
             ),
         )
 
-        # Join the room and connect to the user
+        # Connect to the room (joins LiveKit room and enables audio I/O)
         await ctx.connect()
+
         # Wait until the user or agent disconnects from the room
         await disconnect_event.wait()
     finally:
@@ -513,11 +763,22 @@ async def my_agent(ctx: JobContext):
         ended_at = ended_at_dt.isoformat()
         duration_seconds = max(0, int((ended_at_dt - started_at_dt).total_seconds()))
 
-        req_completed = getattr(assistant, "request_completed", False)
-        succ_reason = getattr(assistant, "success_reason", None)
-        fail_reason = getattr(assistant, "failure_reason", None)
-        has_esc = getattr(assistant, "has_human_escalation", False)
-        has_emerg = getattr(assistant, "has_emergency", False)
+        active_agent = getattr(session, "current_agent", assistant)
+        req_completed = getattr(active_agent, "request_completed", False) or getattr(
+            assistant, "request_completed", False
+        )
+        succ_reason = getattr(active_agent, "success_reason", None) or getattr(
+            assistant, "success_reason", None
+        )
+        fail_reason = getattr(active_agent, "failure_reason", None) or getattr(
+            assistant, "failure_reason", None
+        )
+        has_esc = getattr(active_agent, "has_human_escalation", False) or getattr(
+            assistant, "has_human_escalation", False
+        )
+        has_emerg = getattr(active_agent, "has_emergency", False) or getattr(
+            assistant, "has_emergency", False
+        )
 
         # Inspect session ground-truth history items for guaranteed success detection
         if (
@@ -548,6 +809,7 @@ async def my_agent(ctx: JobContext):
                     "find_nearest_healthcare_facility",
                     "create_escalation",
                     "save_caller_memory",
+                    "handoff_to_clinic_appointment_specialist",
                 ):
                     req_completed = True
                     succ_reason = f"Request handled via {name_str}"

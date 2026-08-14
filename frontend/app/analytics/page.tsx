@@ -29,11 +29,14 @@ interface AnalyticsData {
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAnalytics = async () => {
     try {
-      const res = await fetch('/api/analytics');
+      const res = await fetch(`/api/analytics?t=${Date.now()}`, {
+        cache: 'no-store',
+      });
       if (!res.ok) throw new Error('Failed to load analytics data');
       const json = await res.json();
       setData(json);
@@ -45,9 +48,15 @@ export default function AnalyticsPage() {
     }
   };
 
+  const handleManualRefresh = async () => {
+    setRefreshing(true);
+    await fetchAnalytics();
+    setTimeout(() => setRefreshing(false), 500);
+  };
+
   useEffect(() => {
     fetchAnalytics();
-    const interval = setInterval(fetchAnalytics, 5000); // Auto-refresh every 5s
+    const interval = setInterval(fetchAnalytics, 2000); // Auto-refresh every 2s
     return () => clearInterval(interval);
   }, []);
 
@@ -57,10 +66,10 @@ export default function AnalyticsPage() {
         {/* Header */}
         <div className="flex flex-col gap-4 border-b border-slate-800 pb-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <div className="flex items-center gap-3">
+            <div className="mb-2">
               <Link
                 href="/"
-                className="flex items-center gap-1 text-xs font-medium text-sky-400 hover:underline"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-700"
               >
                 ← Back to Agent
               </Link>
@@ -73,10 +82,13 @@ export default function AnalyticsPage() {
             </p>
           </div>
           <button
-            onClick={fetchAnalytics}
-            className="flex items-center gap-2 self-start rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-700 md:self-auto"
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={refreshing}
+            className="flex cursor-pointer items-center gap-2 self-start rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-700 active:scale-95 disabled:opacity-50 md:self-auto"
           >
-            <span>🔄</span> Refresh Data
+            <span className={refreshing ? 'inline-block animate-spin' : ''}>🔄</span>
+            <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
           </button>
         </div>
 
